@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Akino Solar — Command Center v7</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0f172a; --secondary: #1e293b; --accent: #f97316;
+            --accent-light: rgba(249,115,22,0.15); --text: #f1f5f9; --text-muted: #94a3b8;
+            --success: #22c55e; --warning: #eab308; --danger: #ef4444; --info: #3b82f6;
+            --border: #334155; --surface: #0f172a; --sidebar-w: 240px;
+        }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--primary); color: var(--text); line-height: 1.6; display: flex; min-height: 100vh; }
+
+        /* === SIDEBAR NAV === */
+        .sidebar {
+            width: var(--sidebar-w); background: var(--secondary); position: fixed; top: 0; left: 0;
+            height: 100vh; display: flex; flex-direction: column; z-index: 100;
+            border-right: 1px solid var(--border); transition: transform 0.3s;
+        }
+        .sidebar-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+        .sidebar-logo { font-size: 1.1rem; font-weight: 800; color: var(--accent); letter-spacing: 1.5px; }
+        .sidebar-logo span { display: block; font-size: 0.6rem; color: var(--text-muted); font-weight: 400; letter-spacing: 0; margin-top: 2px; }
+        .overhead-badge { display: inline-block; background: var(--accent); color: #000; padding: 2px 10px; border-radius: 12px; font-size: 0.65rem; font-weight: 700; margin-top: 0.5rem; }
+        .sidebar-nav { flex: 1; overflow-y: auto; padding: 0.4rem 0; -webkit-overflow-scrolling: touch; }
+        .sidebar-nav button {
+            width: 100%; background: none; border: none; color: var(--text-muted);
+            padding: 0.75rem 1.25rem; text-align: left; cursor: pointer; font-size: 0.85rem;
+            display: flex; align-items: center; gap: 0.6rem; transition: all 0.15s;
+            min-height: 44px; /* Touch target */
+        }
+        .sidebar-nav button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+        .sidebar-nav button.active { color: var(--accent); background: var(--accent-light); border-right: 3px solid var(--accent); }
+        .sidebar-profile { padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.8rem; }
+        .sidebar-profile .name { font-weight: 600; color: var(--text); }
+        .sidebar-profile .email { color: var(--text-muted); font-size: 0.65rem; }
+        .mobile-toggle {
+            display: none; position: fixed; top: 0.6rem; left: 0.6rem; z-index: 200;
+            background: var(--secondary); color: var(--accent); border: 1px solid var(--border);
+            padding: 0.6rem 0.9rem; border-radius: 6px; font-size: 1.2rem; cursor: pointer;
+            min-width: 44px; min-height: 44px; /* Touch target */
+        }
+        @media(max-width:768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); box-shadow: 2px 0 8px rgba(0,0,0,0.3); }
+            .mobile-toggle { display: flex; align-items: center; justify-content: center; }
+            .main-area { margin-left: 0 !important; }
+        }
+
+        /* === MAIN === */
+        .main-area { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; }
+        .top-bar {
+            background: var(--secondary); border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 50;
+        }
+        .top-bar-title { font-size: 1rem; font-weight: 600; }
+        .top-bar-right { display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap; }
+        .status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+        @keyframes pulse { 50% { opacity: 0.4; } }
+        main { max-width: 1400px; margin: 0 auto; padding: 1.25rem; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* === CARDS & GRID === */
+        .card { background: var(--secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        .card-header { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .card-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; }
+        .grid-5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 1rem; }
+        .grid-6 { display: grid; grid-template-columns: repeat(6,1fr); gap: 1rem; }
+        @media(max-width:900px) { .grid-3,.grid-4,.grid-5,.grid-6 { grid-template-columns: repeat(2,1fr); } }
+        @media(max-width:600px) { .grid-2,.grid-3,.grid-4,.grid-5,.grid-6 { grid-template-columns: 1fr; } }
+        .section-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .accent { color: var(--accent); } .success { color: var(--success); } .warning { color: var(--warning); } .danger { color: var(--danger); }
+
+        /* === TABLE === */
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { background: var(--primary); color: var(--accent); text-align: left; padding: 0.65rem 0.6rem; font-weight: 600; white-space: nowrap; }
+        td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: rgba(249,115,22,0.04); }
+        @media(max-width:768px) {
+            table { font-size: 0.75rem; }
+            th, td { padding: 0.5rem 0.4rem; }
+        }
+
+        /* === BADGES === */
+        .badge { display: inline-block; padding: 3px 9px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+        .badge-paid { background: #16a34a22; color: var(--success); }
+        .badge-pending { background: #eab30822; color: var(--warning); }
+        .badge-submitted { background: #3b82f622; color: var(--info); }
+        .badge-on-route { background: #f9731622; color: var(--accent); }
+        .badge-available { background: #22c55e22; color: var(--success); }
+        .badge-high { background: #ef444422; color: var(--danger); }
+        .badge-medium { background: #eab30822; color: var(--warning); }
+        .badge-low { background: #22c55e22; color: var(--success); }
+        .badge-scheduled { background: #3b82f622; color: var(--info); }
+
+        /* === BUTTONS === */
+        .btn {
+            padding: 0.6rem 1.1rem; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; transition: all 0.15s;
+            min-height: 44px; /* Touch target */
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: #ea580c; }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn-secondary:hover { background: #475569; }
+        .btn-success { background: var(--success); color: #000; }
+        .btn-success:hover { background: #16a34a; }
+
+        /* === FORMS (FIXED DROPDOWNS) === */
+        .form-group { margin-bottom: 0.85rem; }
+        .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 500; }
+        input, select, textarea {
+            width: 100%; padding: 0.7rem 0.75rem; background: var(--primary);
+            border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+            font-size: 0.9rem; font-family: inherit;
+            min-height: 44px; /* Touch target */
+            -webkit-appearance: none; /* Fix iOS styling */
+            appearance: none;
+        }
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 12px;
+            padding-right: 2.5rem;
+            cursor: pointer;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: var(--secondary); }
+        textarea { min-height: 100px; resize: vertical; }
+        @media(max-width:768px) {
+            input, select, textarea { font-size: 16px; /* Prevent iOS zoom */ }
+        }
+
+        /* === MODALS === */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75); z-index: 1000;
+            justify-content: center; align-items: center; padding: 1rem;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--secondary); border: 1px solid var(--border);
+            border-radius: 8px; max-width: 600px; width: 100%;
+            max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            margin: auto;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+        }
+        .modal-header h3 { font-size: 1.2rem; margin: 0; }
+        .modal-header button {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 1.5rem; cursor: pointer; padding: 0; width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-header button:hover { color: var(--accent); }
+        .modal-body { padding: 1.5rem; }
+        @media(max-width:768px) {
+            .modal { max-height: 95vh; }
+            .modal-body { padding: 1.25rem; }
+        }
+
+        /* === SHEET LINKS === */
+        .sheet-link {
+            display: inline-block; padding: 0.5rem 0.85rem; background: var(--accent-light);
+            color: var(--accent); border-radius: 6px; font-size: 0.75rem; font-weight: 600;
+            text-decoration: none; transition: all 0.15s;
+            min-height: 36px; display: inline-flex; align-items: center;
+        }
+        .sheet-link:hover { background: var(--accent); color: #000; }
+
+        /* === ALERT BAR === */
+        .alert-bar { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+
+        /* === PERSON CARDS === */
+        .person-card { text-align: center; padding: 1.25rem 0.75rem; }
+        .person-avatar { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; color: #fff; margin: 0 auto 0.6rem; }
+
+        /* === AI SIDEBAR === */
+        .ai-toggle {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; width: 58px; height: 58px;
+            border-radius: 50%; background: var(--accent); color: #000; border: none;
+            font-size: 1.6rem; cursor: pointer; z-index: 200;
+            box-shadow: 0 4px 16px rgba(249,115,22,0.4); transition: transform 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ai-toggle:hover { transform: scale(1.1); }
+        .ai-sidebar {
+            position: fixed; top: 0; right: -400px; width: 400px; height: 100vh;
+            background: var(--secondary); border-left: 2px solid var(--accent); z-index: 300;
+            transition: right 0.3s; display: flex; flex-direction: column;
+        }
+        .ai-sidebar.open { right: 0; }
+        .ai-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .ai-actions { padding: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid var(--border); }
+        .ai-action-btn {
+            padding: 0.5rem 0.75rem; background: var(--primary); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text-muted); font-size: 0.75rem; cursor: pointer;
+            transition: all 0.15s; min-height: 36px;
+        }
+        .ai-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .ai-messages { flex: 1; overflow-y: auto; padding: 1rem; -webkit-overflow-scrolling: touch; }
+        .ai-msg { padding: 0.7rem 0.9rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.6rem; max-width: 90%; word-wrap: break-word; }
+        .ai-msg.bot { background: var(--primary); border: 1px solid var(--border); }
+        .ai-msg.user { background: var(--accent); color: #000; margin-left: auto; }
+        .ai-input-area { padding: 1rem; border-top: 1px solid var(--border); display: flex; gap: 0.6rem; }
+        .ai-input-area input { flex: 1; }
+        @media(max-width:768px) {
+            .ai-sidebar { width: 100%; right: -100%; }
+            .ai-toggle { bottom: 1rem; right: 1rem; width: 54px; height: 54px; }
+        }
+
+        @media print { .sidebar, .ai-toggle, .ai-sidebar, .top-bar, .mobile-toggle, .modal-overlay { display: none; } .main-area { margin-left: 0; } .card { break-inside: avoid; } }
+
+        /* MOBILE ENHANCEMENTS */
+        @media(max-width:768px) {
+            body { -webkit-text-size-adjust: 100%; }
+            main { padding: 1rem; }
+            .top-bar { padding: 0.6rem 1rem; }
+            .card { padding: 0.85rem; }
+            .section-title { font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-logo">AKINO SOLAR<span>Command Center v7.0</span></div>
+        <div class="overhead-badge">$43,480/mo overhead</div>
+    </div>
+    <div class="sidebar-nav" id="sidebarNav">
+        <button class="active" onclick="switchTab('dashboard',this)">📊 Dashboard</button>
+        <button onclick="switchTab('jobcalc',this)">🧮 Job Calculator</button>
+        <button onclick="switchTab('routing',this)">🗺️ Routes</button>
+        <button onclick="switchTab('warranty',this)">🛡️ Warranty</button>
+        <button onclick="switchTab('jobcost',this)">💰 Job True Cost</button>
+        <button onclick="switchTab('pnl',this)">📈 P&L Report</button>
+        <button onclick="switchTab('reconciliation',this)">🔄 Reconciliation</button>
+        <button onclick="switchTab('personnel',this)">👥 Personnel</button>
+        <button onclick="switchTab('inventory',this)">📦 Inventory & RMA</button>
+        <button onclick="switchTab('email',this)">📧 Email Monitor</button>
+        <button onclick="switchTab('links',this)">🔗 Links & Apps</button>
+        <button onclick="switchTab('settings',this)">⚙️ Settings</button>
+    </div>
+    <div class="sidebar-profile">
+        <div class="name">Caden Montgomery</div>
+        <div class="email">caden@akinosolar.com</div>
+    </div>
+</aside>
+
+<div class="main-area">
+    <div class="top-bar">
+        <div class="top-bar-title" id="pageTitle">Dashboard</div>
+        <div class="top-bar-right">
+            <span><span class="status-dot"></span> <span style="display: inline-block;">Systems Online</span></span>
+            <span id="clock"></span>
+            <button class="btn btn-primary" onclick="toggleAi()" style="padding:0.5rem 0.9rem;min-height:38px;">🤖 Claude AI</button>
+        </div>
+    </div>
+    <main>
+
+<!-- ========== DASHBOARD ========== -->
+<div id="dashboard" class="tab-content active">
+    <div class="alert-bar">
+        <span>⚠️</span>
+        <span><strong>Action Required:</strong> <span id="dashboardAlertText">Initializing dashboard...</span></span>
+    </div>
+    <div class="grid-6" id="dashboardKPIs" style="margin-bottom:1rem;">
+        <div class="card"><div class="card-header">Today's Jobs</div><div class="card-value accent">—</div></div>
+        <div class="card"><div class="card-header">Total Revenue</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Total Cost</div><div class="card-value danger">—</div></div>
+        <div class="card"><div class="card-header">Profit Margin</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Open Claims</div><div class="card-value warning">—</div></div>
+        <div class="card"><div class="card-header">Unresolved</div><div class="card-value danger">—</div></div>
+    </div>
+
+    <div class="section-title">📂 Quick Access — Google Sheets</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;" id="quickAccessLinks">
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1yL-M-YJqbS5smTqxiJPJrUcW_fz0JF-IX4kkHYV_svE" target="_blank">📊 Job Calculator</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1SxmUhIBU2tUXX7eoH1wWGP6A2bcJstx_K5NrPRWGy1E" target="_blank">🗺️ Route Optimizer</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1cJvAFLZDGNzVxNNCgL6P7snG0MXwb0FB3WoqtTnK-b4" target="_blank">💰 Job True Cost</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1ZqTK21k4S6htIFpFO_ZL1KZ06vPcxR07jtn15fa5j54" target="_blank">🛡️ Warranty Claims</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/11--0Uodbm7hvY2XzXg5-TUipdSgh3DkcmkFPnA5StF4" target="_blank">📈 P&L Document</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1PZDpmUlcfWfmvk3F3FXqLFNuNlSzfkVaAO_4ZytPPek" target="_blank">🧾 True P&L</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1f6QRvfqu6_jACO8gXlJjzGkOVHpWtAIHMl7Mur7tQ7Q" target="_blank">📧 Email Monitor Log</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/10KNqacZeBTMAv4W6lNb2EeKAgVTdPNNPuzhCum4BKXY" target="_blank">🌍 WORLD AKINO</a>
+    </div>
+
+    <div class="section-title">⚡ Quick Actions</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:1rem;" id="quickActionsContainer">
+        <button class="btn btn-primary" onclick="switchTab('jobcalc')">+ New Job</button>
+        <button class="btn btn-secondary" onclick="switchTab('routing')">Optimize Routes</button>
+        <button class="btn btn-secondary" onclick="openAddClaimModal()">+ Warranty Claim</button>
+        <button class="btn btn-secondary" onclick="switchTab('email')">View Emails</button>
+        <button class="btn btn-secondary" onclick="toggleAi()">Ask Claude AI</button>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <div class="section-title">📊 Revenue by Technician</div>
+            <div id="revChart" style="display:flex;align-items:flex-end;gap:8px;height:180px;padding:0.5rem;"></div>
+        </div>
+        <div class="card">
+            <div class="section-title">🔔 Alerts & Activity</div>
+            <div id="alertsContainer" style="font-size:0.82rem;">
+                <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);">Loading alerts...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">👥 Team Status</div>
+        <div class="table-wrap">
+            <table id="teamRatesTable">
+                <thead><tr><th>Tech</th><th>Loaded Rate</th><th>Status</th><th>Jobs Today</th><th>Month Total</th></tr></thead>
+                <tbody id="teamRatesBody">
+                    <tr><td>Loading...</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== JOB CALCULATOR ========== -->
+<div id="jobcalc" class="tab-content">
+    <div class="section-title">🧮 Job Calculator <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1yL-M-YJqbS5smTqxiJPJrUcW_fz0JF-IX4kkHYV_svE" target="_blank">Open Sheet ↗</a></div>
+    <div class="card">
+        <div class="grid-3">
+            <div class="form-group"><label>Date</label><input type="date" id="jcDate"></div>
+            <div class="form-group"><label>Job ID / HCP#</label><input type="text" id="jcJobId" placeholder="JOB-001"></div>
+            <div class="form-group"><label>Customer Name</label><input type="text" id="jcCustomer" placeholder="John Doe"></div>
+            <div class="form-group"><label>Technician</label>
+                <select id="jcTech">
+                    <option value="">Select Tech</option>
+                    <option value="Sam">Sam ($35.21/hr)</option>
+                    <option value="Lucas">Lucas ($28.17/hr)</option>
+                    <option value="Katie">Katie ($28.17/hr)</option>
+                    <option value="Spencer">Spencer ($56.33/hr)</option>
+                    <option value="Lex">Lex ($42.25/hr)</option>
+                    <option value="Andrew">Andrew ($32.50/hr)</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Hours on Site</label><input type="number" id="jcHours" placeholder="2.5" step="0.5"></div>
+            <div class="form-group"><label>Travel Hours</label><input type="number" id="jcTravel" placeholder="1.0" step="0.5"></div>
+            <div class="form-group"><label>Miles (round trip)</label><input type="number" id="jcMiles" placeholder="45"></div>
+            <div class="form-group"><label>Parts Cost ($)</label><input type="number" id="jcParts" placeholder="0" step="0.01"></div>
+            <div class="form-group"><label>Consumables ($)</label><input type="number" id="jcConsumables" placeholder="25" step="0.01"></div>
+            <div class="form-group"><label>Revenue ($)</label><input type="number" id="jcRevenue" placeholder="750" step="0.01"></div>
+            <div class="form-group"><label>Jobs/Week (overhead alloc)</label><input type="number" id="jcJobsWeek" value="5" min="1" max="30"></div>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="calculateJob()">Calculate True Cost</button>
+            <button class="btn btn-secondary" onclick="clearJobCalc()">Clear</button>
+            <button class="btn btn-success" onclick="openSaveJobModal()">Save to Sheet</button>
+        </div>
+    </div>
+    <div id="jcResult" class="card" style="display:none;">
+        <div class="section-title">📊 Job Cost Breakdown</div>
+        <div id="jcBreakdown"></div>
+    </div>
+    <div class="card">
+        <div class="section-title">📜 Recent Job History</div>
+        <div class="table-wrap" style="max-height:350px;overflow-y:auto;">
+            <table>
+                <thead><tr><th>Date</th><th>Job#</th><th>Customer</th><th>Tech</th><th>Revenue</th><th>True Cost</th><th>Margin</th></tr></thead>
+                <tbody id="jobHistoryBody">
+                    <tr><td colspan="7">Loading job history...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== ROUTE OPTIMIZER ========== -->
+<div id="routing" class="tab-content">
+    <div class="section-title">🗺️ Route Optimizer <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1SxmUhIBU2tUXX7eoH1wWGP6A2bcJstx_K5NrPRWGy1E" target="_blank">Open Sheet ↗</a></div>
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <div><strong>Depot:</strong> Knoxville, TN (35.9641, -83.9201) • <strong>Max:</strong> 4 jobs/route</div>
+            <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                <button class="btn btn-primary">Generate Routes</button>
+                <button class="btn btn-secondary">Force Geocode</button>
+            </div>
+        </div>
+    </div>
+    <div class="grid-4" id="routeKPIs">
+        <div class="card"><div class="card-header">Active Routes</div><div class="card-value accent">—</div></div>
+        <div class="card"><div class="card-header">Total Jobs</div><div class="card-value">—</div></div>
+        <div class="card"><div class="card-header">Est. Miles</div><div class="card-value warning">—</div></div>
+        <div class="card"><div class="card-header">Est. Travel Cost</div><div class="card-value danger">—</div></div>
+    </div>
+    <div class="card">
+        <div class="section-title">Today's Routes</div>
+        <div class="table-wrap">
+            <table id="todayRoutesTable">
+                <thead><tr><th>Route</th><th>Tech</th><th>Jobs</th><th>Miles</th><th>Travel $</th><th>Status</th></tr></thead>
+                <tbody id="todayRoutesBody">
+                    <tr><td colspan="6">Loading routes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="section-title">Unassigned Jobs</div>
+        <div class="table-wrap" style="max-height:300px;overflow-y:auto;">
+            <table>
+                <thead><tr><th>Job#</th><th>Customer</th><th>City</th><th>Type</th><th>Priority</th><th>Action</th></tr></thead>
+                <tbody id="jobsAwaitingBody">
+                    <tr><td colspan="6">Loading unassigned jobs...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== WARRANTY TRACKER ========== -->
+<div id="warranty" class="tab-content">
+    <div class="section-title">🛡️ Warranty Claims <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1ZqTK21k4S6htIFpFO_ZL1KZ06vPcxR07jtn15fa5j54" target="_blank">Open Sheet ↗</a></div>
+    <div class="grid-4" id="warrantyKPIs">
+        <div class="card"><div class="card-header">Total Claims</div><div class="card-value">—</div></div>
+        <div class="card"><div class="card-header">Paid</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Unpaid</div><div class="card-value danger">—</div></div>
+        <div class="card"><div class="card-header">Outstanding $</div><div class="card-value warning">—</div></div>
+    </div>
+    <div class="card">
+        <div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;">
+            <label style="font-size:0.85rem;font-weight:600;">Month:</label>
+            <select id="warrantyMonth" onchange="filterWarrantyClaims()" style="width:auto;min-width:140px;">
+                <option value="">All Months</option>
+                <option value="jan2026">January 2026</option>
+                <option value="dec2025">December 2025</option>
+                <option value="nov2025">November 2025</option>
+            </select>
+            <label style="font-size:0.85rem;font-weight:600;margin-left:0.5rem;">Status:</label>
+            <select id="warrantyStatusFilter" onchange="filterWarrantyClaims()" style="width:auto;min-width:160px;">
+                <option value="">All Statuses</option>
+                <option value="Paid">Paid</option>
+                <option value="Needs Attention">Needs Attention</option>
+                <option value="Submitted">Submitted</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Waiting RMA">Waiting RMA</option>
+                <option value="Completed not paid">Completed not paid</option>
+                <option value="Denied">Denied</option>
+            </select>
+            <input type="text" placeholder="Search customer or case#..." id="warrantySearch" oninput="filterWarrantyClaims()" style="width:auto;flex:1;min-width:180px;">
+            <button class="btn btn-success" onclick="openAddClaimModal()">+ Add Claim</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="table-wrap" style="max-height:450px;overflow-y:auto;">
+            <table id="warrantyTable">
+                <thead><tr><th>Status</th><th>Customer</th><th>Date</th><th>Case#</th><th>Tech</th><th>Allotted $</th><th>Adjusted $</th><th>Paid $</th><th>Profit</th><th>Loss</th></tr></thead>
+                <tbody id="warrantyClaimsBody">
+                    <tr><td colspan="10">Loading warranty claims...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== JOB TRUE COST ========== -->
+<div id="jobcost" class="tab-content">
+    <div class="section-title">💰 Job True Cost <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1cJvAFLZDGNzVxNNCgL6P7snG0MXwb0FB3WoqtTnK-b4" target="_blank">Open Sheet ↗</a></div>
+    <div class="card">
+        <div class="section-title">True Cost Formula</div>
+        <div style="background:var(--primary);padding:1rem;border-radius:8px;font-family:monospace;font-size:0.8rem;line-height:1.8;overflow-x:auto;">
+            <strong style="color:var(--accent);">True Cost</strong> = Labor (loaded_rate × hours) + Travel (miles × $0.99) + Parts + Consumables + QA ($85) + Admin ($315) + Risk ($100) + Overhead ($43,480 ÷ jobs/wk × 4.33)
+        </div>
+        <div style="margin-top:0.85rem;display:flex;align-items:center;gap:0.6rem;font-size:0.85rem;flex-wrap:wrap;">
+            <span>Dynamic breakeven at</span>
+            <input type="number" id="tcJPW" value="5" style="width:60px;display:inline;text-align:center;" onchange="updateAllBreakevens()">
+            <span>jobs/wk = <strong id="tcOH" class="accent">$2,008</strong>/job overhead → <strong id="tcBE" class="warning">$2,508</strong> breakeven</span>
+        </div>
+    </div>
+    <div class="grid-3" id="trueCostKPIs">
+        <div class="card"><div class="card-header">Avg Job Cost</div><div class="card-value accent">—</div></div>
+        <div class="card"><div class="card-header">Avg Revenue</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Avg Margin</div><div class="card-value success">—</div></div>
+    </div>
+    <div class="card">
+        <div class="section-title">Cost Component Breakdown (Last 10 Jobs Avg)</div>
+        <div class="table-wrap">
+            <table>
+                <tbody id="costAnalysisBody">
+                    <tr><td colspan="3">Loading cost analysis...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== P&L REPORT ========== -->
+<div id="pnl" class="tab-content">
+    <div class="section-title">📈 P&L Report
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/11--0Uodbm7hvY2XzXg5-TUipdSgh3DkcmkFPnA5StF4" target="_blank">P&L Doc ↗</a>
+        <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1PZDpmUlcfWfmvk3F3FXqLFNuNlSzfkVaAO_4ZytPPek" target="_blank">True P&L ↗</a>
+    </div>
+    <div class="grid-4" id="pnlKPIs">
+        <div class="card"><div class="card-header">Monthly Overhead</div><div class="card-value danger">$43,480</div></div>
+        <div class="card"><div class="card-header">Breakeven / Job</div><div class="card-value warning" id="pnlBE">$2,698</div></div>
+        <div class="card"><div class="card-header">Cost / Hour</div><div class="card-value accent">$250.85</div></div>
+        <div class="card"><div class="card-header">Fuel Rate</div><div class="card-value">$0.99/mi</div></div>
+    </div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="section-title">Insurance & Fixed Costs (Monthly)</div>
+            <table id="insuranceTable">
+                <tbody>
+                    <tr><td>General Liability (GL)</td><td style="text-align:right">$551.08</td></tr>
+                    <tr><td>Auto Insurance</td><td style="text-align:right">$456.65</td></tr>
+                    <tr><td>Workers Comp (WC)</td><td style="text-align:right">$1,250.00</td></tr>
+                    <tr><td>Fleet Insurance</td><td style="text-align:right">$1,800.00</td></tr>
+                    <tr><td>Office Lease</td><td style="text-align:right">$2,500.00</td></tr>
+                    <tr><td>Utilities & Software</td><td style="text-align:right">$6,200.00</td></tr>
+                    <tr style="font-weight:700;border-top:2px solid var(--accent)"><td>Total Fixed Monthly</td><td style="text-align:right;color:var(--accent)">$12,757.73</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card">
+            <div class="section-title">Per-Job Fixed Costs</div>
+            <table>
+                <tbody>
+                    <tr><td>QA Inspection</td><td style="text-align:right">$85.00</td></tr>
+                    <tr><td>Admin / Mgmt / Software</td><td style="text-align:right">$315.00</td></tr>
+                    <tr><td>Risk Buffer</td><td style="text-align:right">$100.00</td></tr>
+                    <tr style="font-weight:700;border-top:2px solid var(--accent)"><td>Total Per-Job Fixed</td><td style="text-align:right;color:var(--accent)">$500.00</td></tr>
+                </tbody>
+            </table>
+            <div style="margin-top:1rem;padding:0.85rem;background:var(--primary);border-radius:6px;font-size:0.8rem;">
+                <strong>Dynamic Overhead:</strong> $43,480 ÷ (<input type="number" id="pnlJPW" value="5" style="width:55px;display:inline;text-align:center;" onchange="updateAllBreakevens()"> jobs/wk × 4.33) = <strong id="pnlOH" class="accent">$2,008</strong>/job
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="section-title">Monthly Revenue vs Expenses</div>
+        <div id="pnlChart" style="display:flex;align-items:flex-end;gap:6px;height:200px;padding:1rem;"></div>
+    </div>
+</div>
+
+<!-- ========== RECONCILIATION ========== -->
+<div id="reconciliation" class="tab-content">
+    <div class="section-title">🔄 Reconciliation</div>
+    <div class="grid-3" id="reconciliationKPIs">
+        <div class="card"><div class="card-header">Unreconciled Claims</div><div class="card-value warning">—</div></div>
+        <div class="card"><div class="card-header">Amount Outstanding</div><div class="card-value danger">—</div></div>
+        <div class="card"><div class="card-header">Last Reconciled</div><div class="card-value">—</div></div>
+    </div>
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Case#</th><th>Customer</th><th>Claim $</th><th>Paid $</th><th>Difference</th><th>Status</th><th>Days Aged</th><th>Action</th></tr></thead>
+                <tbody id="reconciliationBody">
+                    <tr><td colspan="8">Loading reconciliation data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== PERSONNEL ========== -->
+<div id="personnel" class="tab-content">
+    <div class="section-title">👥 Personnel & Team</div>
+    <div class="grid-4" id="personnelContainer">
+        <div class="card person-card"><div class="person-avatar" style="background:var(--accent)">SM</div><div style="font-weight:700">Sam</div><div style="font-size:0.7rem;color:var(--text-muted)">Lead Technician</div><div style="color:var(--accent);font-weight:600;margin:0.3rem 0">$35.21/hr</div><span class="badge badge-on-route">Loading...</span></div>
+    </div>
+</div>
+
+<!-- ========== INVENTORY & RMA ========== -->
+<div id="inventory" class="tab-content">
+    <div class="section-title">📦 Inventory & RMA</div>
+    <div class="grid-3" id="inventoryKPIs">
+        <div class="card"><div class="card-header">Parts in Stock</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Pending RMAs</div><div class="card-value warning">—</div></div>
+        <div class="card"><div class="card-header">Low Stock Items</div><div class="card-value danger">—</div></div>
+    </div>
+    <div class="card">
+        <div class="section-title">RMA Tracking</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>RMA#</th><th>Part</th><th>Status</th><th>Submitted</th><th>Customer</th><th>Notes</th><th>Action</th></tr></thead>
+                <tbody id="activeRMAsBody">
+                    <tr><td colspan="7">Loading RMA data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <button class="btn btn-success" onclick="openAddPartModal()">+ Add Part</button>
+    </div>
+</div>
+
+<!-- ========== EMAIL MONITOR ========== -->
+<div id="email" class="tab-content">
+    <div class="section-title">📧 Email Monitor <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1f6QRvfqu6_jACO8gXlJjzGkOVHpWtAIHMl7Mur7tQ7Q" target="_blank">Open Log ↗</a></div>
+    <div class="grid-4" id="emailKPIs">
+        <div class="card"><div class="card-header">Emails Today</div><div class="card-value accent">—</div></div>
+        <div class="card"><div class="card-header">Action Required</div><div class="card-value danger">—</div></div>
+        <div class="card"><div class="card-header">Categorized</div><div class="card-value success">—</div></div>
+        <div class="card"><div class="card-header">Unresolved</div><div class="card-value warning">—</div></div>
+    </div>
+    <div class="card">
+        <div class="section-title">Monitored Accounts</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.6rem;">
+            <span style="padding:0.5rem 0.85rem;background:var(--accent-light);border-radius:6px;font-size:0.75rem;"><strong>generac@</strong> — Warranty, RMA, Payments</span>
+            <span style="padding:0.5rem 0.85rem;background:rgba(34,197,94,0.15);border-radius:6px;font-size:0.75rem;"><strong>info@</strong> — Inquiries, GoDaddy</span>
+            <span style="padding:0.5rem 0.85rem;background:rgba(234,179,8,0.15);border-radius:6px;font-size:0.75rem;"><strong>customersupport@</strong> — Support</span>
+            <span style="padding:0.5rem 0.85rem;background:rgba(59,130,246,0.15);border-radius:6px;font-size:0.75rem;"><strong>caden@</strong> — Direct</span>
+        </div>
+    </div>
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Date</th><th>From</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="emailActivityBody">
+                    <tr><td colspan="7">Loading email activity...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========== LINKS & APPS ========== -->
+<div id="links" class="tab-content">
+    <div class="section-title">🔗 Links & Apps</div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="section-title accent">Google Sheets</div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1yL-M-YJqbS5smTqxiJPJrUcW_fz0JF-IX4kkHYV_svE" target="_blank">📊 Job Calculator (JOB_CALC)</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1SxmUhIBU2tUXX7eoH1wWGP6A2bcJstx_K5NrPRWGy1E" target="_blank">🗺️ Route Optimizer (ROUTE_OPT)</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1cJvAFLZDGNzVxNNCgL6P7snG0MXwb0FB3WoqtTnK-b4" target="_blank">💰 Job True Cost</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1ZqTK21k4S6htIFpFO_ZL1KZ06vPcxR07jtn15fa5j54" target="_blank">🛡️ Warranty Claims</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/11--0Uodbm7hvY2XzXg5-TUipdSgh3DkcmkFPnA5StF4" target="_blank">📈 P&L Document</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1PZDpmUlcfWfmvk3F3FXqLFNuNlSzfkVaAO_4ZytPPek" target="_blank">🧾 True P&L</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1f6QRvfqu6_jACO8gXlJjzGkOVHpWtAIHMl7Mur7tQ7Q" target="_blank">📧 Email Monitor Log</a>
+                <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/10KNqacZeBTMAv4W6lNb2EeKAgVTdPNNPuzhCum4BKXY" target="_blank">🌍 WORLD AKINO (Hub)</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-title accent">Apps & Platforms</div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <a class="sheet-link" href="https://caden-m.github.io/akino-command-center/" target="_blank">🖥️ Command Center v3 (GitHub Pages)</a>
+                <a class="sheet-link" href="https://lovable.dev/projects/ac83dafc-dd1d-475b-ae86-b4f0f9831b51" target="_blank">📱 Solar Asset Manager (Lovable)</a>
+                <a class="sheet-link" href="https://lovable.dev/projects/95be6ee4-a09b-4c05-a757-92468d05a26b" target="_blank">🗺️ Route Genius (Lovable)</a>
+                <a class="sheet-link" href="https://app.base44.com/apps/6982bcf8eac8e2f626a07a76/editor/preview" target="_blank">🚐 RouteMaster (Base44)</a>
+                <a class="sheet-link" href="https://us2.make.com" target="_blank">⚡ Make.com Automations</a>
+                <a class="sheet-link" href="https://housecallpro.com" target="_blank">📋 HouseCall Pro (CRM)</a>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="section-title accent">Email Accounts</div>
+        <div class="grid-2">
+            <div><strong>generac@akinosolar.com</strong> — Warranty, RMA, payments</div>
+            <div><strong>info@akinosolar.com</strong> — Inquiries, GoDaddy web forms</div>
+            <div><strong>customersupport@akinosolar.com</strong> — Customer support</div>
+            <div><strong>caden@akinosolar.com</strong> — Caden direct (Gmail MCP)</div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SETTINGS ========== -->
+<div id="settings" class="tab-content">
+    <div class="section-title">⚙️ Settings & System Info</div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="section-title">API Configuration</div>
+            <div class="form-group"><label for="apiURL">Google Apps Script Web App URL</label><input type="text" id="apiURL" placeholder="https://script.googleapis.com/macros/s/.../exec"></div>
+            <button class="btn btn-primary" onclick="testAPIConnection()">Test Connection</button>
+            <div id="connectionStatus" style="margin-top:1rem;"></div>
+        </div>
+        <div class="card">
+            <div class="section-title">System IDs</div>
+            <table>
+                <tbody>
+                    <tr><td style="color:var(--text-muted)">Make.com Org ID</td><td>6568366</td></tr>
+                    <tr><td style="color:var(--text-muted)">Make.com Team ID</td><td>1876846</td></tr>
+                    <tr><td style="color:var(--text-muted)">Google Connection ID</td><td>7387683</td></tr>
+                    <tr><td style="color:var(--text-muted)">Depot Coordinates</td><td>35.9641, -83.9201</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+    </main>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- SAVE JOB MODAL -->
+<div class="modal-overlay" id="saveJobModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Save Job to Sheet</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Click the button below to save this job calculation to your Job Calculator sheet.</p>
+            <button class="btn btn-success" onclick="saveJobToSheet()" style="width: 100%;">Save Job</button>
+        </div>
+    </div>
+</div>
+
+<!-- ADD WARRANTY CLAIM MODAL -->
+<div class="modal-overlay" id="addClaimModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Add Warranty Claim</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="claimCustomer">Customer</label>
+                <input type="text" id="claimCustomer" placeholder="Customer Name">
+            </div>
+            <div class="form-group">
+                <label for="claimTech">Technician</label>
+                <select id="claimTech">
+                    <option value="">Select Tech</option>
+                    <option value="Sam">Sam</option>
+                    <option value="Lucas">Lucas</option>
+                    <option value="Katie">Katie</option>
+                    <option value="Spencer">Spencer</option>
+                    <option value="Lex">Lex</option>
+                    <option value="Andrew">Andrew</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="claimAmount">Claim Amount</label>
+                <input type="number" id="claimAmount" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="claimDescription">Description</label>
+                <textarea id="claimDescription" placeholder="Claim details..."></textarea>
+            </div>
+            <button class="btn btn-success" onclick="submitWarrantyClaim()" style="width: 100%;">Submit Claim</button>
+        </div>
+    </div>
+</div>
+
+<!-- ASSIGN ROUTE MODAL -->
+<div class="modal-overlay" id="assignRouteModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Assign Route</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" id="assignRouteBody"></div>
+    </div>
+</div>
+
+<!-- RECONCILE PAYMENT MODAL -->
+<div class="modal-overlay" id="reconcileModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Record Payment</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="paymentAmount">Payment Amount</label>
+                <input type="number" id="paymentAmount" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="paymentDate">Payment Date</label>
+                <input type="date" id="paymentDate">
+            </div>
+            <div class="form-group">
+                <label for="paymentMethod">Payment Method</label>
+                <select id="paymentMethod">
+                    <option value="">Select Method</option>
+                    <option value="check">Check</option>
+                    <option value="ach">ACH Transfer</option>
+                    <option value="credit_card">Credit Card</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <button class="btn btn-success" onclick="submitPayment()" style="width: 100%;">Record Payment</button>
+        </div>
+    </div>
+</div>
+
+<!-- ADD PART MODAL -->
+<div class="modal-overlay" id="addPartModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Add Inventory Part</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="partID">Part ID</label>
+                <input type="text" id="partID" placeholder="PART-001">
+            </div>
+            <div class="form-group">
+                <label for="partDescription">Description</label>
+                <input type="text" id="partDescription" placeholder="Part Description">
+            </div>
+            <div class="form-group">
+                <label for="partQty">Quantity</label>
+                <input type="number" id="partQty" placeholder="0" step="1">
+            </div>
+            <div class="form-group">
+                <label for="partReorder">Reorder Level</label>
+                <input type="number" id="partReorder" placeholder="0" step="1">
+            </div>
+            <button class="btn btn-success" onclick="submitNewPart()" style="width: 100%;">Add Part</button>
+        </div>
+    </div>
+</div>
+
+<!-- UPDATE RMA STATUS MODAL -->
+<div class="modal-overlay" id="rmaStatusModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>Update RMA Status</h3>
+            <button onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="rmaNewStatus">New Status</label>
+                <select id="rmaNewStatus">
+                    <option value="">Select Status</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="received">Received by Vendor</option>
+                    <option value="diagnosed">Diagnosed</option>
+                    <option value="repaired">Repaired</option>
+                    <option value="shipped">Shipped Back</option>
+                    <option value="received_back">Received</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="rmaNote">Notes</label>
+                <textarea id="rmaNote" placeholder="Update notes..."></textarea>
+            </div>
+            <button class="btn btn-success" onclick="submitRMAUpdate()" style="width: 100%;">Update Status</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== AI SIDEBAR ===== -->
+<button class="ai-toggle" onclick="toggleAi()">🤖</button>
+<div class="ai-sidebar" id="aiSidebar">
+    <div class="ai-header">
+        <strong style="color:var(--accent)">Claude AI Assistant</strong>
+        <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;" onclick="toggleAi()">✕</button>
+    </div>
+    <div class="ai-actions">
+        <button class="ai-action-btn" onclick="aiAction('Morning briefing')">📋 Morning Briefing</button>
+        <button class="ai-action-btn" onclick="aiAction('Unpaid warranty claims')">💰 Unpaid Claims</button>
+        <button class="ai-action-btn" onclick="aiAction('Optimize routes for today')">🗺️ Optimize Routes</button>
+        <button class="ai-action-btn" onclick="aiAction('Check emails')">📧 Check Emails</button>
+        <button class="ai-action-btn" onclick="aiAction('Job profitability report')">📊 Profitability</button>
+        <button class="ai-action-btn" onclick="aiAction('Overdue HCP tasks')">⚠️ Overdue Tasks</button>
+    </div>
+    <div class="ai-messages" id="aiMessages">
+        <div class="ai-msg bot">Hey Caden! I'm your Akino Solar AI assistant. I can help with warranty claims, route optimization, job costing, email scanning, and more. What do you need?</div>
+    </div>
+    <div class="ai-input-area">
+        <input type="text" id="aiInput" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter')sendAiMsg()">
+        <button class="btn btn-primary" onclick="sendAiMsg()">Send</button>
+    </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const CONFIG = {
+    API_URL: '',
+    OVERHEAD: 43480,
+    FUEL_RATE: 0.99,
+    QA_FEE: 85,
+    ADMIN_FEE: 315,
+    RISK_BUFFER: 100,
+    RATES: {
+        Sam: 35.21,
+        Lucas: 28.17,
+        Katie: 28.17,
+        Spencer: 56.33,
+        Lex: 42.25,
+        Caden: 40.63,
+        Jen: 5.28,
+        Andrew: 32.50
+    },
+    SHEETS: {
+        JOB_CALC: '1yL-M-YJqbS5smTqxiJPJrUcW_fz0JF-IX4kkHYV_svE',
+        ROUTE_OPT: '1SxmUhIBU2tUXX7eoH1wWGP6A2bcJstx_K5NrPRWGy1E',
+        JOB_TRUE_COST: '1cJvAFLZDGNzVxNNCgL6P7snG0MXwb0FB3WoqtTnK-b4',
+        WARRANTY: '1ZqTK21k4S6htIFpFO_ZL1KZ06vPcxR07jtn15fa5j54',
+        PNL_DOC: '11--0Uodbm7hvY2XzXg5-TUipdSgh3DkcmkFPnA5StF4',
+        TRUE_PNL: '1PZDpmUlcfWfmvk3F3FXqLFNuNlSzfkVaAO_4ZytPPek',
+        EMAIL_MONITOR: '1f6QRvfqu6_jACO8gXlJjzGkOVHpWtAIHMl7Mur7tQ7Q',
+        WORLD_AKINO: '10KNqacZeBTMAv4W6lNb2EeKAgVTdPNNPuzhCum4BKXY'
+    }
+};
+
+const tabNames = { dashboard:'Dashboard', jobcalc:'Job Calculator', routing:'Routes', warranty:'Warranty', jobcost:'Job True Cost', pnl:'P&L Report', reconciliation:'Reconciliation', personnel:'Personnel', inventory:'Inventory & RMA', email:'Email Monitor', links:'Links & Apps', settings:'Settings' };
+
+// Cache for warranty data
+window.warrantyDataCache = [];
+window.currentClaimID = null;
+window.currentRMAID = null;
+
+// ===== LOAD CONFIG =====
+function loadConfig() {
+    const saved = localStorage.getItem('akino-api-url');
+    if (saved) { CONFIG.API_URL = saved; }
+    if (document.getElementById('apiURL')) {
+        document.getElementById('apiURL').value = CONFIG.API_URL;
+    }
+}
+
+function saveAPIURL() {
+    CONFIG.API_URL = document.getElementById('apiURL').value;
+    localStorage.setItem('akino-api-url', CONFIG.API_URL);
+}
+
+// ===== SANITIZE (XSS PROTECTION) =====
+function sanitize(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ===== API FUNCTIONS =====
+async function apiGet(action) {
+    if (!CONFIG.API_URL) return null;
+    try {
+        const resp = await fetch(CONFIG.API_URL + '?action=' + action);
+        const data = await resp.json();
+        return data;
+    } catch (error) {
+        console.error('API Error:', error);
+        return null;
+    }
+}
+
+async function apiPost(action, data) {
+    if (!CONFIG.API_URL) return null;
+    try {
+        const resp = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, data })
+        });
+        const result = await resp.json();
+        return result;
+    } catch (error) {
+        console.error('API Error:', error);
+        return null;
+    }
+}
+
+// ===== OVERHEAD CALC =====
+function calcOverhead(jpw) { return CONFIG.OVERHEAD / (jpw * (52/12)); }
+
+function updateAllBreakevens() {
+    const fields = ['pnlJPW','tcJPW'];
+    let jpw = 5;
+    fields.forEach(f => { const el = document.getElementById(f); if(el && el === document.activeElement) jpw = parseInt(el.value)||5; });
+    fields.forEach(f => { const el = document.getElementById(f); if(el) el.value = jpw; });
+    const oh = calcOverhead(jpw);
+    const be = oh + CONFIG.ADMIN_FEE + CONFIG.QA_FEE + CONFIG.RISK_BUFFER;
+    ['pnlOH','tcOH'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent='$'+oh.toFixed(0); });
+    ['pnlBE','tcBE'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent='$'+be.toFixed(0); });
+}
+
+// ===== TAB SWITCHING =====
+function switchTab(id, btn) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+    const tab = document.getElementById(id);
+    if(tab) tab.classList.add('active');
+    if(btn) { btn.classList.add('active'); }
+    else {
+        const btns = document.querySelectorAll('.sidebar-nav button');
+        const idx = Object.keys(tabNames).indexOf(id);
+        if(idx>=0 && btns[idx]) btns[idx].classList.add('active');
+    }
+    document.getElementById('pageTitle').textContent = tabNames[id] || id;
+    document.querySelector('.sidebar')?.classList.remove('open');
+
+    // Load data when switching tabs
+    loadTabData(id);
+}
+
+// ===== LOAD TAB DATA =====
+function loadTabData(tabName) {
+    switch (tabName) {
+        case 'dashboard':
+            loadDashboard();
+            break;
+        case 'jobcalc':
+            loadJobCalculator();
+            break;
+        case 'routing':
+            loadRouteOptimizer();
+            break;
+        case 'warranty':
+            loadWarrantyTracker();
+            break;
+        case 'jobcost':
+            loadJobTrueCost();
+            break;
+        case 'pnl':
+            loadPNLReport();
+            break;
+        case 'reconciliation':
+            loadReconciliation();
+            break;
+        case 'personnel':
+            loadPersonnel();
+            break;
+        case 'inventory':
+            loadInventory();
+            break;
+        case 'email':
+            loadEmailMonitor();
+            break;
+    }
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard() {
+    const data = await apiGet('dashboard');
+    if (!data || !data.success) {
+        renderDashboardDefault();
+        return;
+    }
+
+    // KPIs
+    const kpiHTML = `
+        <div class="card"><div class="card-header">Today's Jobs</div><div class="card-value accent">${data.todayJobs || 0}</div></div>
+        <div class="card"><div class="card-header">Total Revenue</div><div class="card-value success">$${(data.totalRevenue || 0).toLocaleString()}</div></div>
+        <div class="card"><div class="card-header">Total Cost</div><div class="card-value danger">$${(data.totalCost || 0).toLocaleString()}</div></div>
+        <div class="card"><div class="card-header">Profit Margin</div><div class="card-value success">${(data.profitMargin || 0).toFixed(1)}%</div></div>
+        <div class="card"><div class="card-header">Open Claims</div><div class="card-value warning">${data.openClaims || 0}</div></div>
+        <div class="card"><div class="card-header">Unresolved</div><div class="card-value danger">${data.unresolved || 0}</div></div>
+    `;
+    document.getElementById('dashboardKPIs').innerHTML = kpiHTML;
+
+    // Alert
+    document.getElementById('dashboardAlertText').textContent = data.alertText || '3 unresolved customers • $8,520 unpaid warranty claims • 11 overdue HCP tasks';
+
+    // Alerts
+    const alerts = data.alerts || [
+        { message: 'Dennis Stadler — warranty unpaid 42 days' },
+        { message: '11 overdue HouseCall Pro tasks (since Aug 2025)' },
+        { message: '3 jobs need scheduling in Knoxville area' }
+    ];
+    const alertsHTML = alerts.map(alert => `
+        <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);">${sanitize(alert.message)}</div>
+    `).join('');
+    document.getElementById('alertsContainer').innerHTML = alertsHTML;
+
+    // Team Rates
+    loadTeamRates();
+}
+
+function renderDashboardDefault() {
+    loadTeamRates();
+    document.getElementById('dashboardAlertText').textContent = 'API not configured — using static data';
+}
+
+function loadTeamRates() {
+    const ratesHTML = Object.entries(CONFIG.RATES).map(([tech, rate]) => `
+        <tr>
+            <td><strong>${sanitize(tech)}</strong></td>
+            <td>$${rate.toFixed(2)}/hr</td>
+            <td><span class="badge badge-available">Active</span></td>
+            <td>${Math.floor(Math.random() * 4)}</td>
+            <td>${Math.floor(Math.random() * 20)}</td>
+        </tr>
+    `).join('');
+    document.getElementById('teamRatesBody').innerHTML = ratesHTML;
+}
+
+// ============ JOB CALCULATOR ============
+async function loadJobCalculator() {
+    document.getElementById('jcDate').valueAsDate = new Date();
+
+    const data = await apiGet('jobHistory');
+    if (data && data.success && data.jobs) {
+        const jobsHTML = data.jobs.map(job => `
+            <tr>
+                <td>${sanitize(job.date)}</td>
+                <td>${sanitize(job.jobID)}</td>
+                <td>${sanitize(job.customer)}</td>
+                <td>${sanitize(job.tech)}</td>
+                <td>$${parseFloat(job.revenue).toFixed(2)}</td>
+                <td>$${parseFloat(job.trueCost).toFixed(2)}</td>
+                <td class="${parseFloat(job.margin) >= 0 ? 'success' : 'danger'}">${parseFloat(job.margin).toFixed(1)}%</td>
+            </tr>
+        `).join('');
+        document.getElementById('jobHistoryBody').innerHTML = jobsHTML;
+    } else {
+        document.getElementById('jobHistoryBody').innerHTML = '<tr><td colspan="7">No job history available</td></tr>';
+    }
+}
+
+function calculateJob() {
+    const tech = document.getElementById('jcTech').value;
+    const hours = parseFloat(document.getElementById('jcHours').value)||0;
+    const travel = parseFloat(document.getElementById('jcTravel').value)||0;
+    const miles = parseFloat(document.getElementById('jcMiles').value)||0;
+    const parts = parseFloat(document.getElementById('jcParts').value)||0;
+    const consumables = parseFloat(document.getElementById('jcConsumables').value)||0;
+    const revenue = parseFloat(document.getElementById('jcRevenue').value)||0;
+    const jpw = parseInt(document.getElementById('jcJobsWeek').value)||5;
+    if(!tech){alert('Select a technician');return;}
+    const rate = CONFIG.RATES[tech]||0;
+    const labor = rate * (hours + travel);
+    const travelCost = miles * CONFIG.FUEL_RATE;
+    const overhead = calcOverhead(jpw);
+    const totalCost = labor + travelCost + parts + consumables + CONFIG.QA_FEE + CONFIG.ADMIN_FEE + CONFIG.RISK_BUFFER + overhead;
+    const profit = revenue - totalCost;
+    const margin = revenue > 0 ? ((profit/revenue)*100) : 0;
+    const mc = margin >= 0 ? 'var(--success)' : 'var(--danger)';
+
+    document.getElementById('jcResult').style.display = 'block';
+    document.getElementById('jcBreakdown').innerHTML = `
+        <table>
+            <tr><td>Labor (${tech} @ $${rate}/hr × ${(hours+travel).toFixed(1)}h)</td><td style="text-align:right">$${labor.toFixed(2)}</td></tr>
+            <tr><td>Travel (${miles} mi × $${CONFIG.FUEL_RATE})</td><td style="text-align:right">$${travelCost.toFixed(2)}</td></tr>
+            <tr><td>Parts</td><td style="text-align:right">$${parts.toFixed(2)}</td></tr>
+            <tr><td>Consumables</td><td style="text-align:right">$${consumables.toFixed(2)}</td></tr>
+            <tr><td>QA Inspection</td><td style="text-align:right">$${CONFIG.QA_FEE.toFixed(2)}</td></tr>
+            <tr><td>Admin/Mgmt/SW</td><td style="text-align:right">$${CONFIG.ADMIN_FEE.toFixed(2)}</td></tr>
+            <tr><td>Risk Buffer</td><td style="text-align:right">$${CONFIG.RISK_BUFFER.toFixed(2)}</td></tr>
+            <tr><td>Overhead (${jpw} jobs/wk)</td><td style="text-align:right">$${overhead.toFixed(2)}</td></tr>
+            <tr style="font-weight:700;border-top:2px solid var(--accent);"><td>TOTAL TRUE COST</td><td style="text-align:right;color:var(--accent)">$${totalCost.toFixed(2)}</td></tr>
+            <tr><td>Revenue</td><td style="text-align:right">$${revenue.toFixed(2)}</td></tr>
+            <tr style="font-weight:700;"><td>Profit / (Loss)</td><td style="text-align:right;color:${mc}">$${profit.toFixed(2)}</td></tr>
+            <tr style="font-weight:700;"><td>Margin</td><td style="text-align:right;color:${mc}">${margin.toFixed(1)}%</td></tr>
+        </table>`;
+}
+
+function clearJobCalc() {
+    ['jcDate','jcJobId','jcCustomer','jcHours','jcTravel','jcMiles','jcParts','jcConsumables','jcRevenue'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('jcTech').selectedIndex = 0;
+    document.getElementById('jcResult').style.display = 'none';
+}
+
+function openSaveJobModal() {
+    document.getElementById('saveJobModal').classList.add('active');
+}
+
+async function saveJobToSheet() {
+    const jobData = {
+        date: document.getElementById('jcDate').value,
+        jobID: document.getElementById('jcJobId').value,
+        customer: document.getElementById('jcCustomer').value,
+        tech: document.getElementById('jcTech').value,
+        hours: parseFloat(document.getElementById('jcHours').value),
+        travelHours: parseFloat(document.getElementById('jcTravel').value),
+        miles: parseFloat(document.getElementById('jcMiles').value),
+        parts: parseFloat(document.getElementById('jcParts').value),
+        consumables: parseFloat(document.getElementById('jcConsumables').value),
+        revenue: parseFloat(document.getElementById('jcRevenue').value)
+    };
+
+    const result = await apiPost('saveJob', jobData);
+    if (result && result.success) {
+        alert('Job saved successfully!');
+        closeModal();
+        loadJobCalculator();
+    } else {
+        alert('Failed to save job: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+// ============ ROUTE OPTIMIZER ============
+async function loadRouteOptimizer() {
+    const data = await apiGet('routeData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Active Routes</div><div class="card-value accent">${data.activeRoutes || 0}</div></div>
+            <div class="card"><div class="card-header">Total Jobs</div><div class="card-value">${data.totalJobs || 0}</div></div>
+            <div class="card"><div class="card-header">Est. Miles</div><div class="card-value warning">${data.totalMiles || 0}</div></div>
+            <div class="card"><div class="card-header">Est. Travel Cost</div><div class="card-value danger">$${(data.travelCost || 0).toFixed(2)}</div></div>
+        `;
+        document.getElementById('routeKPIs').innerHTML = kpis;
+
+        if (data.routes) {
+            const routesHTML = data.routes.map(route => `
+                <tr>
+                    <td>${sanitize(route.name)}</td>
+                    <td>${sanitize(route.tech)}</td>
+                    <td>${route.jobs} jobs</td>
+                    <td>${route.miles} mi</td>
+                    <td>$${route.cost.toFixed(2)}</td>
+                    <td><span class="badge badge-on-route">${sanitize(route.status)}</span></td>
+                </tr>
+            `).join('');
+            document.getElementById('todayRoutesBody').innerHTML = routesHTML;
+        }
+
+        if (data.unassigned) {
+            const unassignedHTML = data.unassigned.map(job => `
+                <tr>
+                    <td>${sanitize(job.jobID)}</td>
+                    <td>${sanitize(job.customer)}</td>
+                    <td>${sanitize(job.city)}</td>
+                    <td>${sanitize(job.type)}</td>
+                    <td><span class="badge badge-${job.priority === 'High' ? 'high' : 'medium'}">${sanitize(job.priority)}</span></td>
+                    <td><button class="btn btn-primary" style="padding:0.4rem 0.75rem;min-height:36px;" onclick="openAssignRouteModal('${sanitize(job.jobID)}')">Assign</button></td>
+                </tr>
+            `).join('');
+            document.getElementById('jobsAwaitingBody').innerHTML = unassignedHTML;
+        }
+    }
+}
+
+function openAssignRouteModal(jobID) {
+    const techs = Object.keys(CONFIG.RATES);
+    const html = `
+        <div class="form-group">
+            <label for="assignTech">Assign to Tech</label>
+            <select id="assignTech">
+                <option value="">Select Technician</option>
+                ${techs.map(t => `<option value="${t}">${sanitize(t)}</option>`).join('')}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="routeName">Route Name</label>
+            <input type="text" id="routeName" placeholder="Route-001">
+        </div>
+        <button class="btn btn-success" onclick="submitRouteAssignment('${sanitize(jobID)}')" style="width: 100%;">Assign Route</button>
+    `;
+    document.getElementById('assignRouteBody').innerHTML = html;
+    document.getElementById('assignRouteModal').classList.add('active');
+}
+
+async function submitRouteAssignment(jobID) {
+    const data = {
+        jobID: jobID,
+        tech: document.getElementById('assignTech').value,
+        route: document.getElementById('routeName').value
+    };
+    const result = await apiPost('assignRoute', data);
+    if (result && result.success) {
+        alert('Route assigned!');
+        closeModal();
+        loadRouteOptimizer();
+    } else {
+        alert('Failed to assign route: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+// ============ WARRANTY TRACKER ============
+async function loadWarrantyTracker() {
+    const data = await apiGet('warrantyData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Total Claims</div><div class="card-value">${data.totalClaims || 0}</div></div>
+            <div class="card"><div class="card-header">Paid</div><div class="card-value success">${data.paidCount || 0}</div></div>
+            <div class="card"><div class="card-header">Unpaid</div><div class="card-value danger">${data.unpaidCount || 0}</div></div>
+            <div class="card"><div class="card-header">Outstanding $</div><div class="card-value warning">$${(data.outstandingAmount || 0).toLocaleString()}</div></div>
+        `;
+        document.getElementById('warrantyKPIs').innerHTML = kpis;
+
+        if (data.claims) {
+            window.warrantyDataCache = data.claims;
+            filterWarrantyClaims();
+        }
+    } else {
+        // Fallback to static data
+        window.warrantyDataCache = [
+            {status:'Paid',customer:'Rivera',date:'01/15',claimID:'GEN-4510',tech:'Sam',allotted:850,adjusted:850,paid:850,profit:238,loss:0},
+            {status:'Needs Attention',customer:'Testa',date:'01/03',claimID:'GEN-4498',tech:'Sam',allotted:425,adjusted:425,paid:0,profit:0,loss:425}
+        ];
+        filterWarrantyClaims();
+    }
+}
+
+function filterWarrantyClaims() {
+    const claims = window.warrantyDataCache || [];
+    const search = document.getElementById('warrantySearch').value.toLowerCase();
+    const status = document.getElementById('warrantyStatusFilter').value;
+
+    const filtered = claims.filter(claim => {
+        const matchSearch = !search || claim.customer.toLowerCase().includes(search) || claim.claimID.toLowerCase().includes(search);
+        const matchStatus = !status || claim.status === status;
+        return matchSearch && matchStatus;
+    });
+
+    const html = filtered.map(claim => {
+        const statusClass = claim.status === 'Paid' ? 'badge-paid' : 'badge-pending';
+        return `
+            <tr data-status="${sanitize(claim.status)}">
+                <td><span class="badge ${statusClass}">${sanitize(claim.status)}</span></td>
+                <td>${sanitize(claim.customer)}</td>
+                <td>${sanitize(claim.date)}</td>
+                <td>${sanitize(claim.claimID)}</td>
+                <td>${sanitize(claim.tech)}</td>
+                <td>$${claim.allotted.toFixed(2)}</td>
+                <td>$${claim.adjusted.toFixed(2)}</td>
+                <td>$${claim.paid.toFixed(2)}</td>
+                <td class="${claim.profit > 0 ? 'success' : ''}">$${claim.profit.toFixed(2)}</td>
+                <td class="${claim.loss > 0 ? 'danger' : ''}">$${claim.loss > 0 ? claim.loss.toFixed(2) : '—'}</td>
+            </tr>
+        `;
+    }).join('');
+    document.getElementById('warrantyClaimsBody').innerHTML = html || '<tr><td colspan="10">No claims match your filters</td></tr>';
+}
+
+function openAddClaimModal() {
+    document.getElementById('addClaimModal').classList.add('active');
+}
+
+async function submitWarrantyClaim() {
+    const data = {
+        customer: document.getElementById('claimCustomer').value,
+        tech: document.getElementById('claimTech').value,
+        amount: parseFloat(document.getElementById('claimAmount').value),
+        description: document.getElementById('claimDescription').value,
+        date: new Date().toISOString().split('T')[0]
+    };
+    const result = await apiPost('addWarrantyClaim', data);
+    if (result && result.success) {
+        alert('Claim submitted!');
+        closeModal();
+        loadWarrantyTracker();
+    } else {
+        alert('Failed to submit claim: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+// ============ JOB TRUE COST ============
+async function loadJobTrueCost() {
+    const data = await apiGet('jobTrueCostData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Avg Job Cost</div><div class="card-value accent">$${(data.avgCost || 0).toFixed(0)}</div></div>
+            <div class="card"><div class="card-header">Avg Revenue</div><div class="card-value success">$${(data.avgRevenue || 0).toFixed(0)}</div></div>
+            <div class="card"><div class="card-header">Avg Margin</div><div class="card-value success">${(data.avgMargin || 0).toFixed(1)}%</div></div>
+        `;
+        document.getElementById('trueCostKPIs').innerHTML = kpis;
+
+        if (data.breakdown) {
+            const breakdownHTML = `
+                <tr><td>Labor (loaded)</td><td>$${data.breakdown.labor.toFixed(2)}</td><td>${data.breakdown.laborPct.toFixed(1)}%</td></tr>
+                <tr><td>Travel (fuel)</td><td>$${data.breakdown.travel.toFixed(2)}</td><td>${data.breakdown.travelPct.toFixed(1)}%</td></tr>
+                <tr><td>Parts</td><td>$${data.breakdown.parts.toFixed(2)}</td><td>${data.breakdown.partsPct.toFixed(1)}%</td></tr>
+                <tr><td>Consumables</td><td>$${data.breakdown.consumables.toFixed(2)}</td><td>${data.breakdown.consumablesPct.toFixed(1)}%</td></tr>
+                <tr><td>QA ($85/job)</td><td>$${CONFIG.QA_FEE.toFixed(2)}</td><td>12.4%</td></tr>
+                <tr><td>Admin/Mgmt/SW ($315)</td><td>$${CONFIG.ADMIN_FEE.toFixed(2)}</td><td>45.8%</td></tr>
+                <tr><td>Risk Buffer ($100)</td><td>$${CONFIG.RISK_BUFFER.toFixed(2)}</td><td>14.6%</td></tr>
+                <tr style="font-weight:700;border-top:2px solid var(--accent)"><td>Subtotal (before overhead)</td><td>—</td><td>—</td></tr>
+            `;
+            document.getElementById('costAnalysisBody').innerHTML = breakdownHTML;
+        }
+    }
+}
+
+// ============ P&L REPORT ============
+async function loadPNLReport() {
+    updateAllBreakevens();
+}
+
+// ============ RECONCILIATION ============
+async function loadReconciliation() {
+    const data = await apiGet('reconciliationData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Unreconciled Claims</div><div class="card-value warning">${data.unreconciled || 0}</div></div>
+            <div class="card"><div class="card-header">Amount Outstanding</div><div class="card-value danger">$${(data.outstanding || 0).toLocaleString()}</div></div>
+            <div class="card"><div class="card-header">Last Reconciled</div><div class="card-value">${data.lastReconciled || 'N/A'}</div></div>
+        `;
+        document.getElementById('reconciliationKPIs').innerHTML = kpis;
+
+        if (data.claims) {
+            const claimsHTML = data.claims.map(claim => `
+                <tr>
+                    <td>${sanitize(claim.claimID)}</td>
+                    <td>${sanitize(claim.customer)}</td>
+                    <td>$${claim.claimAmount.toFixed(2)}</td>
+                    <td>$${claim.paidAmount.toFixed(2)}</td>
+                    <td class="${claim.difference < 0 ? 'danger' : 'success'}">$${claim.difference.toFixed(2)}</td>
+                    <td><span class="badge ${claim.paidAmount >= claim.claimAmount ? 'badge-paid' : 'badge-pending'}">${claim.paidAmount >= claim.claimAmount ? 'Reconciled' : 'Unpaid'}</span></td>
+                    <td>${claim.daysAged || '—'}</td>
+                    <td><button class="btn btn-primary" style="padding:0.4rem 0.75rem;min-height:36px;" onclick="openReconcileModal('${sanitize(claim.claimID)}')">Record</button></td>
+                </tr>
+            `).join('');
+            document.getElementById('reconciliationBody').innerHTML = claimsHTML;
+        }
+    }
+}
+
+function openReconcileModal(claimID) {
+    window.currentClaimID = claimID;
+    document.getElementById('paymentDate').valueAsDate = new Date();
+    document.getElementById('reconcileModal').classList.add('active');
+}
+
+async function submitPayment() {
+    const data = {
+        claimID: window.currentClaimID,
+        amount: parseFloat(document.getElementById('paymentAmount').value),
+        date: document.getElementById('paymentDate').value,
+        method: document.getElementById('paymentMethod').value
+    };
+    const result = await apiPost('reconcileClaim', data);
+    if (result && result.success) {
+        alert('Payment recorded!');
+        closeModal();
+        loadReconciliation();
+    } else {
+        alert('Failed to record payment: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+// ============ PERSONNEL ============
+async function loadPersonnel() {
+    const data = await apiGet('personnelData');
+    if (data && data.success && data.personnel) {
+        const html = data.personnel.map(person => `
+            <div class="card person-card">
+                <div class="person-avatar" style="background:${person.color || 'var(--accent)'}">${person.name.substring(0,2).toUpperCase()}</div>
+                <div style="font-weight:700">${sanitize(person.name)}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted)">${sanitize(person.role)}</div>
+                <div style="color:var(--accent);font-weight:600;margin:0.3rem 0">$${person.rate.toFixed(2)}/hr</div>
+                <span class="badge badge-available">${sanitize(person.status)}</span>
+                <div style="font-size:0.7rem;margin-top:0.5rem;color:var(--text-muted)">${person.jobs} jobs this month</div>
+            </div>
+        `).join('');
+        document.getElementById('personnelContainer').innerHTML = html;
+    } else {
+        // Fallback
+        const colors = ['var(--accent)','var(--success)','#9333ea','var(--warning)','var(--danger)','#0ea5e9','#64748b','#ec4899'];
+        let i = 0;
+        const html = Object.entries(CONFIG.RATES).map(([name, rate]) => `
+            <div class="card person-card">
+                <div class="person-avatar" style="background:${colors[i++ % colors.length]}">${name.substring(0,2).toUpperCase()}</div>
+                <div style="font-weight:700">${sanitize(name)}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted)">Technician</div>
+                <div style="color:var(--accent);font-weight:600;margin:0.3rem 0">$${rate.toFixed(2)}/hr</div>
+                <span class="badge badge-available">Active</span>
+                <div style="font-size:0.7rem;margin-top:0.5rem;color:var(--text-muted)">${Math.floor(Math.random()*20)} jobs this month</div>
+            </div>
+        `).join('');
+        document.getElementById('personnelContainer').innerHTML = html;
+    }
+}
+
+// ============ INVENTORY ============
+async function loadInventory() {
+    const data = await apiGet('inventoryData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Parts in Stock</div><div class="card-value success">${data.totalParts || 0}</div></div>
+            <div class="card"><div class="card-header">Pending RMAs</div><div class="card-value warning">${data.pendingRMAs || 0}</div></div>
+            <div class="card"><div class="card-header">Low Stock Items</div><div class="card-value danger">${data.lowStock || 0}</div></div>
+        `;
+        document.getElementById('inventoryKPIs').innerHTML = kpis;
+
+        if (data.rmas) {
+            const rmaHTML = data.rmas.map(rma => `
+                <tr>
+                    <td>${sanitize(rma.id)}</td>
+                    <td>${sanitize(rma.part)}</td>
+                    <td><span class="badge badge-submitted">${sanitize(rma.status)}</span></td>
+                    <td>${sanitize(rma.date)}</td>
+                    <td>${sanitize(rma.customer)}</td>
+                    <td>${sanitize(rma.notes)}</td>
+                    <td><button class="btn btn-primary" style="padding:0.4rem 0.75rem;min-height:36px;" onclick="openRMAModal('${sanitize(rma.id)}')">Update</button></td>
+                </tr>
+            `).join('');
+            document.getElementById('activeRMAsBody').innerHTML = rmaHTML;
+        }
+    }
+}
+
+function openAddPartModal() {
+    document.getElementById('addPartModal').classList.add('active');
+}
+
+async function submitNewPart() {
+    const data = {
+        id: document.getElementById('partID').value,
+        description: document.getElementById('partDescription').value,
+        qty: parseInt(document.getElementById('partQty').value),
+        reorderLevel: parseInt(document.getElementById('partReorder').value)
+    };
+    const result = await apiPost('addInventory', data);
+    if (result && result.success) {
+        alert('Part added!');
+        closeModal();
+        loadInventory();
+    } else {
+        alert('Failed to add part: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+function openRMAModal(rmaID) {
+    window.currentRMAID = rmaID;
+    document.getElementById('rmaStatusModal').classList.add('active');
+}
+
+async function submitRMAUpdate() {
+    const data = {
+        rmaID: window.currentRMAID,
+        status: document.getElementById('rmaNewStatus').value,
+        notes: document.getElementById('rmaNote').value
+    };
+    const result = await apiPost('updateRMA', data);
+    if (result && result.success) {
+        alert('RMA updated!');
+        closeModal();
+        loadInventory();
+    } else {
+        alert('Failed to update RMA: ' + sanitize(result?.error || 'Unknown error'));
+    }
+}
+
+// ============ EMAIL MONITOR ============
+async function loadEmailMonitor() {
+    const data = await apiGet('emailData');
+    if (data && data.success) {
+        const kpis = `
+            <div class="card"><div class="card-header">Emails Today</div><div class="card-value accent">${data.todayCount || 0}</div></div>
+            <div class="card"><div class="card-header">Action Required</div><div class="card-value danger">${data.actionRequired || 0}</div></div>
+            <div class="card"><div class="card-header">Categorized</div><div class="card-value success">${data.categorized || 0}</div></div>
+            <div class="card"><div class="card-header">Unresolved</div><div class="card-value warning">${data.unresolved || 0}</div></div>
+        `;
+        document.getElementById('emailKPIs').innerHTML = kpis;
+
+        if (data.emails) {
+            const emailsHTML = data.emails.map(email => `
+                <tr>
+                    <td>${sanitize(email.date)}</td>
+                    <td>${sanitize(email.from)}</td>
+                    <td>${sanitize(email.subject)}</td>
+                    <td>${sanitize(email.category)}</td>
+                    <td><span class="badge badge-${email.priority === 'High' ? 'high' : 'medium'}">${sanitize(email.priority)}</span></td>
+                    <td><span class="badge badge-${email.status === 'Done' ? 'paid' : 'pending'}">${sanitize(email.status)}</span></td>
+                    <td>${sanitize(email.action)}</td>
+                </tr>
+            `).join('');
+            document.getElementById('emailActivityBody').innerHTML = emailsHTML;
+        }
+    }
+}
+
+// ============ MODAL FUNCTIONS ============
+function closeModal() {
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.classList.remove('active');
+    });
+}
+
+// ===== CHARTS =====
+function buildRevChart() {
+    const data = [{n:'Sam',v:32500,c:'#f97316'},{n:'Lex',v:28400,c:'#ef4444'},{n:'Katie',v:22100,c:'#9333ea'},{n:'Lucas',v:18900,c:'#22c55e'},{n:'Andrew',v:15200,c:'#3b82f6'},{n:'Spencer',v:12800,c:'#eab308'}];
+    const max = Math.max(...data.map(d=>d.v));
+    const el = document.getElementById('revChart');
+    if(!el) return;
+    el.innerHTML = data.map(d => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="font-size:0.65rem;color:var(--text-muted)">$${(d.v/1000).toFixed(1)}k</div>
+        <div style="width:100%;background:${d.c};border-radius:4px 4px 0 0;height:${(d.v/max*140).toFixed(0)}px;min-height:8px;transition:height 0.5s;"></div>
+        <div style="font-size:0.65rem;font-weight:600;">${d.n}</div>
+    </div>`).join('');
+}
+
+function buildPnlChart() {
+    const data = [{m:'Sep',r:38,e:31},{m:'Oct',r:42,e:34},{m:'Nov',r:36,e:30},{m:'Dec',r:44,e:36},{m:'Jan',r:48,e:38},{m:'Feb',r:41,e:33}];
+    const max = 50;
+    const el = document.getElementById('pnlChart');
+    if(!el) return;
+    el.innerHTML = data.map(d => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <div style="display:flex;gap:3px;align-items:flex-end;height:160px;">
+            <div style="width:16px;background:var(--success);border-radius:3px 3px 0 0;height:${(d.r/max*150).toFixed(0)}px;" title="Revenue $${d.r}k"></div>
+            <div style="width:16px;background:var(--danger);border-radius:3px 3px 0 0;height:${(d.e/max*150).toFixed(0)}px;" title="Expenses $${d.e}k"></div>
+        </div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">${d.m}</div>
+    </div>`).join('');
+}
+
+// ===== AI SIDEBAR =====
+function toggleAi() { document.getElementById('aiSidebar').classList.toggle('open'); }
+
+function aiAction(q) {
+    addAiMsg(q, 'user');
+    setTimeout(() => {
+        const responses = {
+            'Morning briefing': '📋 Good morning Caden! Today: 4 jobs scheduled (Sam 3, Katie 1), 3 emails need attention, $8,520 in unpaid claims. Priority: Follow up on Testa GEN-4498 (42 days overdue).',
+            'Unpaid warranty claims': '💰 3 unpaid claims totaling $8,520:\n• Testa GEN-4498 — $425 (42 days!)\n• Hogan GEN-4535 — $1,200 (23 days)\n• Browning GEN-4550 — $350 (Waiting RMA)',
+            'Optimize routes for today': '🗺️ Current routes look good. Route C (Lex, 4 jobs, 124 mi) is at max capacity. Suggestion: Move JOB-128 Morrison (Maryville) to Route B (Katie) — only 12 mi detour.',
+            'Check emails': '📧 6 emails today. 3 need action:\n1. RMA-045 status update (High)\n2. Quote request from customer (Med)\n3. GEN-4560 warranty update (Med)',
+            'Job profitability report': '📊 Last 10 jobs: Avg revenue $925, avg cost $687, avg margin 25.7%. Watch out: JOB-125 (Bane/Katie) lost $95 — short travel allotment.',
+            'Overdue HCP tasks': '⚠️ 11 overdue HouseCall Pro tasks! Oldest from Aug 2025. Top 3 to close:\n1. Morrison follow-up (6 months)\n2. Winkler rescheduled (4 months)\n3. Davis inspection (3 months)'
+        };
+        addAiMsg(responses[q] || `I'll look into "${q}" for you. In a live integration, this would query your Google Sheets and email data.`, 'bot');
+    }, 600);
+}
+
+function sendAiMsg() {
+    const input = document.getElementById('aiInput');
+    const q = input.value.trim();
+    if(!q) return;
+    addAiMsg(q, 'user');
+    input.value = '';
+    setTimeout(() => addAiMsg(`I'll help with "${q}". In the full integration, this connects to your Sheets API, email monitor, and route engine.`, 'bot'), 700);
+}
+
+function addAiMsg(text, type) {
+    const el = document.getElementById('aiMessages');
+    const div = document.createElement('div');
+    div.className = 'ai-msg ' + type;
+    div.textContent = text;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+}
+
+// ===== CLOCK =====
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+// ===== API CONNECTION TEST =====
+function testAPIConnection() {
+    const url = document.getElementById('apiURL').value;
+    if (!url) {
+        alert('Please enter API URL first');
+        return;
+    }
+    saveAPIURL();
+    fetch(url + '?action=ping')
+        .then(r => r.json())
+        .then(data => {
+            const status = document.getElementById('connectionStatus');
+            if (data.success) {
+                status.innerHTML = '<div style="background:rgba(34,197,94,0.15);border:1px solid var(--success);color:var(--success);padding:0.85rem;border-radius:6px;">✓ Connection successful!</div>';
+            } else {
+                status.innerHTML = '<div style="background:rgba(239,68,68,0.15);border:1px solid var(--danger);color:var(--danger);padding:0.85rem;border-radius:6px;">✗ Connection failed: ' + sanitize(data.error || 'Unknown error') + '</div>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('connectionStatus').innerHTML = '<div style="background:rgba(239,68,68,0.15);border:1px solid var(--danger);color:var(--danger);padding:0.85rem;border-radius:6px;">✗ Error: ' + sanitize(err.message) + '</div>';
+        });
+}
+
+// ===== INIT =====
+window.addEventListener('DOMContentLoaded', () => {
+    loadConfig();
+    updateClock();
+    setInterval(updateClock, 30000);
+    buildRevChart();
+    buildPnlChart();
+    updateAllBreakevens();
+    document.getElementById('jcDate').valueAsDate = new Date();
+    loadDashboard();
+});
+</script>
+</body>
+</html>
