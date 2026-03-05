@@ -1,0 +1,90 @@
+<!--
+  ============================================================
+  AKINO COMMAND CENTER — google.script.run FETCH INTERCEPTOR
+  ============================================================
+
+  INSTALLATION:
+  In your Apps Script editor, open dashboard.html and paste this
+  entire <script> block BETWEEN:
+    <div id="root"></div>
+  AND the React bundle:
+    <script>(()=>{var Ey=Object.create;...
+
+  This intercepts the React app's fetch() calls and routes them
+  through google.script.run.apiCall() instead of raw HTTP fetch.
+
+  WHY THIS IS NEEDED:
+  When dashboard.html is served via HtmlService, it runs inside a
+  sandboxed iframe on googleusercontent.com. Raw fetch() calls to
+  the script.google.com web-app URL cause:
+  1. CORS errors (cross-origin request)
+  2. Auth redirect loops (Google login page returned instead of JSON)
+  3. Intermittent failures under load
+
+  google.script.run uses GAS's internal RPC channel, which bypasses
+  all of these issues.
+
+  REQUIRES: The apiCall() function in code.gs (see code.gs in this repo)
+  ============================================================
+-->
+
+<script>
+(function() {
+  // Only activate when running inside Google Apps Script HtmlService
+  if (typeof google === 'undefined' || !google.script || !google.script.run) {
+    console.log('[AkinoBridge] Not in GAS HtmlService — using native fetch');
+    return;
+  }
+  console.log('[AkinoBridge] google.script.run detected — intercepting API fetch calls');
+
+  var originalFetch = window.fetch;
+
+  window.fetch = function(url, options) {
+    // Only intercept calls that contain ?action= (our GAS API pattern)
+    if (typeof url === 'string' && url.indexOf('action=') !== -1) {
+      try {
+        var fullUrl = new URL(url, window.location.href);
+        var action = fullUrl.searchParams.get('action');
+
+        if (action) {
+          // Collect non-action query params (range, limit, etc.)
+          var params = {};
+          fullUrl.searchParams.forEach(function(value, key) {
+            if (key !== 'action') params[key] = value;
+          });
+
+          return new Promise(function(resolve) {
+            google.script.run
+              .withSuccessHandler(function(result) {
+                // Return a fetch-Response-like object so .json() chain works
+                resolve({
+                  ok: true,
+                  status: 200,
+                  json: function() { return Promise.resolve(result); },
+                  text: function() { return Promise.resolve(JSON.stringify(result)); }
+                });
+              })
+              .withFailureHandler(function(error) {
+                // On server error, resolve (don't reject) with error response
+                // so the React app's try/catch handles it gracefully
+                var errMsg = (error && error.message) ? error.message : String(error);
+                resolve({
+                  ok: false,
+                  status: 500,
+                  json: function() { return Promise.resolve({ ok: false, error: errMsg }); },
+                  text: function() { return Promise.resolve(JSON.stringify({ ok: false, error: errMsg })); }
+                });
+              })
+              .apiCall(action, params);
+          });
+        }
+      } catch (e) {
+        console.warn('[AkinoBridge] URL parse failed, falling through to native fetch:', e);
+      }
+    }
+
+    // Non-API calls (fonts, external resources, etc.) pass through unchanged
+    return originalFetch.apply(this, arguments);
+  };
+})();
+</script>

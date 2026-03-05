@@ -3,12 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akino Command Center</title>
-    <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxTJPY3JErAq5A8KMND1isEqj09AEoSPNjZa_hw_54BBN_q6n4PYpzrfmr_AH3U4TCW/exec";
-    </script>
+    <title>Akino Solar — Command Center</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 48px;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+        }
+        h1 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+        p { color: #64748b; font-size: 14px; line-height: 1.6; margin: 0 0 24px; }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .note {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to the Akino Command Center</h1>
+    <div class="card">
+        <div style="font-size: 48px; margin-bottom: 16px;">&#9728;&#65039;</div>
+        <h1>Akino Solar Command Center</h1>
+        <p>
+            The dashboard is served directly from Google Apps Script.<br>
+            Click below to open it (requires @akinosolar.com login).
+        </p>
+        <a class="btn" href="https://script.google.com/a/macros/akinosolar.com/s/AKfycbw3R-EdyOwCH3se6nQBmaDmP97exam9_9U7520xhtCsmKBieqi_5m9ZtckPqhDJE3FX/exec">
+            Open Command Center
+        </a>
+        <div class="note">
+            Powered by WORLD AKINO &middot; React 19 &middot; Google Apps Script
+        </div>
+    </div>
 </body>
 </html>
