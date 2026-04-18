@@ -360,6 +360,18 @@ body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; he
 </head>
 <body>
 
+<!-- PASSWORD GATE -->
+<div id="pw-gate" style="display:none;position:fixed;inset:0;background:#0F172A;z-index:99999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+  <div style="background:white;border-radius:16px;padding:36px 44px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);min-width:300px;">
+    <div style="font-size:24px;margin-bottom:4px;">☀</div>
+    <div style="font-size:18px;font-weight:800;color:#0F172A;margin-bottom:4px;">Akino Solar</div>
+    <div style="font-size:13px;color:#64748B;margin-bottom:20px;">Route Planner — Team Access</div>
+    <input id="pw-input" type="password" placeholder="Password" style="width:100%;padding:10px 14px;border:1.5px solid #CBD5E1;border-radius:8px;font-size:14px;font-family:inherit;outline:none;margin-bottom:10px;" onfocus="this.style.borderColor='#F97316'" onblur="this.style.borderColor='#CBD5E1'"/>
+    <div id="pw-error" style="display:none;color:#DC2626;font-size:12px;margin-bottom:10px;">Incorrect password. Try again.</div>
+    <button onclick="submitPassword()" style="width:100%;padding:10px;background:#F97316;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Enter</button>
+  </div>
+</div>
+
 <!-- LOADING -->
 <div class="loading-overlay" id="loading">
   <div class="loading-card">
@@ -1511,9 +1523,39 @@ async function refreshData() {
 }
 
 // ═══════════════════════════════════════════════
+// PASSWORD GATE
+// ═══════════════════════════════════════════════
+function checkPassword() {
+  const PASS = 'Happydays23!';
+  const stored = sessionStorage.getItem('akino_auth');
+  if (stored === PASS) return true;
+  const gate = document.getElementById('pw-gate');
+  gate.style.display = 'flex';
+  document.getElementById('pw-input').focus();
+  return false;
+}
+function submitPassword() {
+  const val = document.getElementById('pw-input').value;
+  if (val === 'Happydays23!') {
+    sessionStorage.setItem('akino_auth', val);
+    document.getElementById('pw-gate').style.display = 'none';
+    init();
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('pw-gate').style.display !== 'none') submitPassword();
+});
+
+// ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  if (checkPassword()) init();
+});
 </script>
 </body>
 </html>
