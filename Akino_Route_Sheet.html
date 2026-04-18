@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Akino Route Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #1E293B; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TOP BAR ── */
+.topbar {
+  background: #0F172A; color: white;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; height: 50px; flex-shrink: 0;
+  border-bottom: 2px solid #F97316;
+}
+.topbar-logo { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+.topbar-logo span { color: #F97316; font-size: 18px; }
+.topbar-divider { width: 1px; height: 26px; background: #334155; }
+.topbar-title { font-size: 13px; font-weight: 600; color: #94A3B8; }
+.topbar-spacer { flex: 1; }
+.topbar-pill {
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; gap: 5px;
+}
+.pill-live { background: #14532D; color: #4ADE80; }
+.pill-demo { background: #7C2D12; color: #FCA5A5; }
+.pill-loading { background: #1E3A5F; color: #93C5FD; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.dot-pulse { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── TABS (Employee / Owner) ── */
+.tab-bar {
+  display: flex; background: #0F172A; border-bottom: 1px solid #1E293B;
+  padding: 0 16px; gap: 0; flex-shrink: 0;
+}
+.toptab {
+  padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: #64748B; border-bottom: 2px solid transparent; transition: all .15s;
+  white-space: nowrap;
+}
+.toptab:hover { color: #CBD5E1; }
+.toptab.active { color: #F97316; border-bottom-color: #F97316; }
+
+/* ── MAIN LAYOUT ── */
+.view { display: none; flex: 1; overflow: hidden; }
+.view.active { display: flex; }
+
+/* ── EMPLOYEE VIEW: LEFT + RIGHT SPLIT ── */
+.emp-view { display: flex; flex-direction: row; flex: 1; overflow: hidden; }
+.left { display: flex; flex-direction: column; width: 360px; border-right: 1px solid #E2E8F0; background: white; overflow: hidden; flex-shrink: 0; }
+
+/* Search + filters */
+.search-area { padding: 10px; border-bottom: 1px solid #F1F5F9; flex-shrink: 0; }
+.search-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.search-input {
+  flex: 1; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 7px;
+  font-size: 12px; font-family: inherit; outline: none; transition: border .15s;
+}
+.search-input:focus { border-color: #F97316; box-shadow: 0 0 0 3px #FFF7ED; }
+.btn-refresh {
+  padding: 7px 10px; background: #F1F5F9; border: 1px solid #CBD5E1;
+  border-radius: 7px; cursor: pointer; font-size: 12px; color: #475569;
+  transition: all .15s; white-space: nowrap;
+}
+.btn-refresh:hover { background: #E2E8F0; }
+
+.filter-tabs { display: flex; gap: 3px; }
+.ftab {
+  flex: 1; padding: 5px 3px; text-align: center; font-size: 10px; font-weight: 600;
+  border-radius: 5px; cursor: pointer; border: 1px solid transparent;
+  color: #64748B; background: #F8FAFC; transition: all .12s;
+}
+.ftab:hover { background: #F1F5F9; }
+.ftab.active { background: #F97316; color: white; border-color: #EA6C00; }
+.ftab-count {
+  display: inline-block; background: rgba(0,0,0,.15); border-radius: 8px;
+  padding: 0 4px; font-size: 9px; margin-left: 2px;
+}
+.ftab.active .ftab-count { background: rgba(255,255,255,.25); }
+
+/* Job list */
+.job-list { flex: 1; overflow-y: auto; }
+.section-label {
+  padding: 5px 10px 3px; font-size: 9px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: .06em; background: #F8FAFC;
+  border-bottom: 1px solid #F1F5F9; position: sticky; top: 0; z-index: 1;
+}
+.job-row {
+  display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px;
+  border-bottom: 1px solid #F8FAFC; cursor: pointer; transition: background .1s;
+  position: relative;
+}
+.job-row:hover { background: #F8FAFC; }
+.job-row.in-route { background: #FFF7ED; border-left: 3px solid #F97316; }
+.job-row.nearby { background: #FEFCE8; border-left: 3px solid #EAB308; }
+.job-row.in-route.nearby { background: #FFF7ED; border-left: 3px solid #F97316; }
+
+.job-check {
+  width: 19px; height: 19px; border-radius: 5px; border: 2px solid #CBD5E1;
+  flex-shrink: 0; margin-top: 1px; display: flex; align-items: center;
+  justify-content: center; font-size: 11px; font-weight: 700; transition: all .15s;
+}
+.job-row.in-route .job-check { background: #F97316; border-color: #F97316; color: white; }
+.job-info { flex: 1; min-width: 0; }
+.job-name { font-size: 12px; font-weight: 600; color: #1E293B; }
+.job-addr { font-size: 10px; color: #64748B; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-tags { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
+.tag {
+  padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600;
+}
+.tag-orange { background: #FED7AA; color: #9A3412; }
+.tag-blue { background: #DBEAFE; color: #1E40AF; }
+.tag-green { background: #DCFCE7; color: #166534; }
+.tag-yellow { background: #FEF9C3; color: #854D0E; }
+.tag-gray { background: #F1F5F9; color: #475569; }
+.tag-purple { background: #EDE9FE; color: #5B21B6; }
+.tag-red { background: #FEE2E2; color: #991B1B; }
+
+/* Map link inline */
+.job-maplink {
+  font-size: 9px; color: #3B82F6; text-decoration: none; margin-left: 2px;
+}
+.job-maplink:hover { text-decoration: underline; }
+
+.no-results { padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12px; }
+
+/* ── ROUTE PANEL (multi-route) ── */
+.route-panel {
+  border-top: 2px solid #E2E8F0; background: white; flex-shrink: 0;
+  max-height: 46vh; display: flex; flex-direction: column;
+}
+.rp-header {
+  padding: 8px 10px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid #F1F5F9; flex-shrink: 0; gap: 6px;
+}
+.rp-title { font-size: 12px; font-weight: 700; color: #1E293B; white-space: nowrap; }
+.rp-tabs { display: flex; gap: 3px; flex: 1; overflow-x: auto; }
+.route-tab {
+  padding: 3px 9px; border-radius: 12px; font-size: 10px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; transition: all .12s;
+  border: 1.5px solid #E2E8F0; color: #475569; background: white;
+}
+.route-tab.active { color: white; border-color: transparent; }
+.route-tab.rt-r1 { background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8; }
+.route-tab.rt-r1.active { background: #1D4ED8; color: white; border-color: #1D4ED8; }
+.route-tab.rt-r2 { background: #F0FDF4; border-color: #BBF7D0; color: #15803D; }
+.route-tab.rt-r2.active { background: #15803D; color: white; border-color: #15803D; }
+.route-tab.rt-r3 { background: #FFF7ED; border-color: #FED7AA; color: #C2410C; }
+.route-tab.rt-r3.active { background: #C2410C; color: white; border-color: #C2410C; }
+.route-tab.rt-r4 { background: #FAF5FF; border-color: #DDD6FE; color: #6D28D9; }
+.route-tab.rt-r4.active { background: #6D28D9; color: white; border-color: #6D28D9; }
+.route-tab.rt-r5 { background: #FFF1F2; border-color: #FECDD3; color: #BE123C; }
+.route-tab.rt-r5.active { background: #BE123C; color: white; border-color: #BE123C; }
+.route-tab.rt-add { background: #F8FAFC; border-color: #CBD5E1; color: #64748B; }
+.route-tab.rt-add:hover { background: #F1F5F9; }
+
+.rp-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.btn-sm {
+  padding: 4px 9px; border-radius: 5px; font-size: 10px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .15s; white-space: nowrap;
+}
+.btn-orange { background: #F97316; color: white; }
+.btn-orange:hover { background: #EA6C00; }
+.btn-slate { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+.btn-slate:hover { background: #E2E8F0; }
+.btn-blue { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.btn-blue:hover { background: #DBEAFE; }
+.btn-green { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
+.btn-green:hover { background: #DCFCE7; }
+.btn-sm:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Route config row (driver + start/end) */
+.route-config {
+  padding: 6px 10px; background: #F8FAFC; border-bottom: 1px solid #F1F5F9;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex-shrink: 0;
+}
+.rc-label { font-size: 10px; font-weight: 600; color: #64748B; white-space: nowrap; }
+.rc-select {
+  font-size: 10px; border: 1px solid #CBD5E1; border-radius: 5px;
+  padding: 2px 5px; color: #1E293B; background: white; font-family: inherit; outline: none;
+}
+.rc-input {
+  font-size: 10px; border: 1px solid #CBD5E1; border-radius: 5px;
+  padding: 2px 6px; color: #1E293B; background: white; font-family: inherit; outline: none;
+  width: 140px;
+}
+.rc-input:focus, .rc-select:focus { border-color: #F97316; }
+
+.rp-stops { overflow-y: auto; flex: 1; }
+.rp-empty { padding: 14px; text-align: center; color: #94A3B8; font-size: 11px; }
+
+.rp-stop {
+  display: flex; align-items: center; gap: 7px; padding: 6px 10px;
+  border-bottom: 1px solid #F8FAFC;
+}
+.stop-num {
+  width: 20px; height: 20px; border-radius: 50%; color: white;
+  font-size: 10px; font-weight: 700; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+.stop-num.depot-dot { background: #334155; }
+.stop-num.end-dot   { background: #334155; }
+.stop-body { flex: 1; min-width: 0; }
+.stop-name { font-size: 11px; font-weight: 600; color: #1E293B; }
+.stop-leg  { font-size: 9px; color: #3B82F6; margin-top: 1px; }
+.stop-maplink { font-size: 9px; color: #F97316; text-decoration: none; margin-left: 5px; }
+.stop-maplink:hover { text-decoration: underline; }
+.stop-x {
+  padding: 1px 5px; background: none; border: none; color: #CBD5E1;
+  cursor: pointer; font-size: 14px; line-height: 1; border-radius: 3px;
+}
+.stop-x:hover { background: #FEE2E2; color: #EF4444; }
+
+.rp-summary {
+  padding: 6px 10px; background: #F8FAFC; border-top: 1px solid #E2E8F0;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; flex-shrink: 0;
+}
+.rp-stat { text-align: center; }
+.rp-stat-val { font-size: 13px; font-weight: 700; color: #1E293B; }
+.rp-stat-lbl { font-size: 8px; color: #94A3B8; text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── RIGHT: MAP ── */
+.right { display: flex; flex-direction: column; overflow: hidden; position: relative; flex: 1; }
+#map { flex: 1; z-index: 0; min-height: 200px; }
+
+/* Recommendations strip */
+.rec-strip {
+  background: white; border-top: 1px solid #E2E8F0; padding: 8px 12px;
+  display: none; flex-shrink: 0; max-height: 140px; overflow-y: auto;
+}
+.rec-strip-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px;
+}
+.rec-strip-title { font-size: 11px; font-weight: 700; color: #1E293B; }
+.radius-row { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #64748B; }
+.radius-row input[type=range] { width: 70px; accent-color: #F97316; }
+.radius-val { font-weight: 700; color: #F97316; min-width: 28px; }
+.rec-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.rec-chip {
+  padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;
+  cursor: pointer; border: 1px solid; transition: all .12s;
+}
+.chip-unsched  { background: #FEFCE8; border-color: #EAB308; color: #854D0E; }
+.chip-unsched:hover { background: #FEF08A; }
+.chip-sched    { background: #EFF6FF; border-color: #3B82F6; color: #1E40AF; }
+.chip-sched:hover { background: #DBEAFE; }
+.chip-customer { background: #F5F3FF; border-color: #8B5CF6; color: #5B21B6; }
+.chip-customer:hover { background: #EDE9FE; }
+.chip-more     { background: #F1F5F9; border-color: #CBD5E1; color: #64748B; cursor: default; }
+
+/* Map overlay */
+.map-overlay { position: absolute; top: 10px; right: 10px; z-index: 500; display: flex; flex-direction: column; gap: 5px; }
+.map-pill {
+  background: white; border-radius: 7px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  padding: 5px 10px; font-size: 10px; font-weight: 600; color: #475569;
+  cursor: pointer; border: none; display: flex; align-items: center; gap: 4px;
+}
+.map-pill:hover { background: #F8FAFC; }
+
+/* ── OWNER VIEW ── */
+.owner-view {
+  display: none; flex-direction: column; flex: 1; overflow: hidden;
+  background: #F8FAFC;
+}
+.owner-view.active { display: flex; }
+.owner-header {
+  padding: 12px 18px; background: white; border-bottom: 1px solid #E2E8F0;
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.owner-header h2 { font-size: 15px; font-weight: 700; }
+.owner-kpi-bar {
+  display: flex; gap: 10px; padding: 12px 18px; background: white;
+  border-bottom: 1px solid #E2E8F0; flex-wrap: wrap; flex-shrink: 0;
+}
+.kpi-card {
+  flex: 1; min-width: 100px; background: #F8FAFC; border-radius: 8px;
+  padding: 10px 14px; border: 1px solid #E2E8F0;
+}
+.kpi-val { font-size: 20px; font-weight: 800; color: #1E293B; }
+.kpi-lbl { font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+
+.owner-content { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 14px; }
+.owner-route-card {
+  background: white; border-radius: 10px; border: 1px solid #E2E8F0;
+  overflow: hidden;
+}
+.orc-header {
+  padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid #F1F5F9;
+}
+.orc-title { font-size: 13px; font-weight: 700; }
+.orc-pills { display: flex; gap: 6px; }
+.orc-pill { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+.pill-profit { background: #DCFCE7; color: #166534; }
+.pill-loss   { background: #FEE2E2; color: #991B1B; }
+.pill-neutral { background: #F1F5F9; color: #475569; }
+
+.orc-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.orc-table th { padding: 5px 10px; text-align: left; font-size: 9px; font-weight: 700; color: #94A3B8; text-transform: uppercase; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+.orc-table td { padding: 7px 10px; border-bottom: 1px solid #F8FAFC; }
+.orc-table tr:last-child td { border-bottom: none; }
+.orc-table .td-num { font-weight: 600; color: #64748B; }
+.orc-table .td-profit { color: #166534; font-weight: 700; }
+.orc-table .td-loss   { color: #991B1B; font-weight: 700; }
+.orc-table .td-maplink a { color: #F97316; font-size: 9px; text-decoration: none; }
+.orc-table .td-maplink a:hover { text-decoration: underline; }
+.orc-footer { padding: 8px 14px; background: #F8FAFC; display: flex; gap: 16px; font-size: 11px; flex-wrap: wrap; }
+.orc-footer span { color: #64748B; }
+.orc-footer b { color: #1E293B; }
+.orc-footer .verdict { font-weight: 700; }
+.verdict-profit { color: #15803D; }
+.verdict-loss   { color: #DC2626; }
+
+/* ── LOADING OVERLAY ── */
+.loading-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,.78);
+  display: flex; align-items: center; justify-content: center; z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+.loading-card {
+  background: white; border-radius: 14px; padding: 30px 40px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); min-width: 260px;
+}
+.loading-spinner {
+  width: 34px; height: 34px; border: 3px solid #E2E8F0; border-top-color: #F97316;
+  border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+.loading-card p  { font-size: 11px; color: #64748B; }
+.loading-bar-track { height: 4px; background: #F1F5F9; border-radius: 2px; margin-top: 12px; overflow: hidden; }
+.loading-bar-fill { height: 100%; background: #F97316; border-radius: 2px; transition: width .3s; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 18px; right: 18px; background: #0F172A; color: white;
+  padding: 9px 14px; border-radius: 9px; font-size: 11px; font-weight: 500;
+  z-index: 9998; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  transform: translateY(60px); opacity: 0; transition: all .25s;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* Mobile */
+@media (max-width: 700px) {
+  .left { width: 100%; border-right: none; }
+  .emp-view { flex-direction: column; }
+  .right { min-height: 280px; }
+  .rp-summary { grid-template-columns: repeat(3,1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <h3>Syncing with HCP</h3>
+    <p id="load-msg">Pulling all jobs &amp; customers…</p>
+    <div class="loading-bar-track"><div class="loading-bar-fill" id="load-bar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo"><span>☀</span> Akino Solar</div>
+  <div class="topbar-divider"></div>
+  <div class="topbar-title">Route Planner</div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-pill pill-loading" id="status-pill">
+    <div class="dot dot-pulse"></div>
+    <span id="status-text">Connecting…</span>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <div class="toptab active" onclick="switchView('emp',this)">🗺 Route Builder</div>
+  <div class="toptab" onclick="switchView('owner',this)">📊 Owner P&amp;L</div>
+</div>
+
+<!-- ── EMPLOYEE VIEW ── -->
+<div class="view active" id="view-emp">
+<div class="emp-view">
+
+  <!-- LEFT PANEL -->
+  <div class="left">
+    <div class="search-area">
+      <div class="search-row">
+        <input class="search-input" id="search" type="text" placeholder="Search name, address, city, job #…" oninput="filterJobs()"/>
+        <button class="btn-refresh" id="refresh-btn" onclick="refreshData()">↻ Sync</button>
+      </div>
+      <div class="filter-tabs" id="filter-tabs">
+        <div class="ftab active" data-f="all" onclick="setFilter('all',this)">All <span class="ftab-count" id="cnt-all">0</span></div>
+        <div class="ftab" data-f="needs scheduling" onclick="setFilter('needs scheduling',this)">Unsched <span class="ftab-count" id="cnt-unsched">0</span></div>
+        <div class="ftab" data-f="scheduled" onclick="setFilter('scheduled',this)">Sched <span class="ftab-count" id="cnt-sched">0</span></div>
+        <div class="ftab" data-f="nearby" onclick="setFilter('nearby',this)">📍 Nearby <span class="ftab-count" id="cnt-nearby">0</span></div>
+      </div>
+    </div>
+
+    <div class="job-list" id="job-list"></div>
+
+    <!-- MULTI-ROUTE PANEL -->
+    <div class="route-panel" id="route-panel">
+      <div class="rp-header">
+        <div class="rp-tabs" id="rp-tabs">
+          <!-- tabs injected here -->
+        </div>
+        <div class="rp-actions">
+          <button class="btn-sm btn-blue" onclick="optimizeCurrentRoute()" id="btn-optimize" disabled>⚡</button>
+          <button class="btn-sm btn-green" onclick="openMapsCurrentRoute()" id="btn-maps" disabled>▶ Maps</button>
+          <button class="btn-sm btn-slate" onclick="clearCurrentRoute()">✕</button>
+        </div>
+      </div>
+      <!-- Route config: driver + start/end -->
+      <div class="route-config" id="route-config">
+        <span class="rc-label">Driver:</span>
+        <select class="rc-select" id="rc-driver" onchange="updateRouteConfig()">
+          <option value="">— assign —</option>
+          <option>Caden</option>
+          <option>Lucas</option>
+          <option>Sam</option>
+          <option>Spencer</option>
+          <option>Andrew</option>
+          <option>Katie</option>
+          <option>Lex</option>
+        </select>
+        <span class="rc-label">Start:</span>
+        <input class="rc-input" id="rc-start" placeholder="Depot (default)" oninput="updateRouteConfig()"/>
+        <span class="rc-label">End:</span>
+        <input class="rc-input" id="rc-end" placeholder="Return to Depot" oninput="updateRouteConfig()"/>
+      </div>
+      <div class="rp-stops" id="rp-stops">
+        <div class="rp-empty">Tap a job to add it to the active route</div>
+      </div>
+      <div class="rp-summary" id="rp-summary" style="display:none">
+        <div class="rp-stat"><div class="rp-stat-val" id="s-stops">0</div><div class="rp-stat-lbl">Stops</div></div>
+        <div class="rp-stat"><div class="rp-stat-val" id="s-miles">—</div><div class="rp-stat-lbl">Miles</div></div>
+        <div class="rp-stat"><div class="rp-stat-val" id="s-time">—</div><div class="rp-stat-lbl">Drive</div></div>
+        <div class="rp-stat"><div class="rp-stat-val" id="s-fuel">—</div><div class="rp-stat-lbl">Fuel</div></div>
+        <div class="rp-stat"><div class="rp-stat-val" id="s-rev">—</div><div class="rp-stat-lbl">Revenue</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: MAP + RECOMMENDATIONS -->
+  <div class="right">
+    <div id="map"></div>
+
+    <div class="map-overlay">
+      <button class="map-pill" onclick="fitAll()">🗺 All Jobs</button>
+      <button class="map-pill" onclick="fitRoute()">📍 Route</button>
+    </div>
+
+    <!-- Recommendations strip (appears after optimize) -->
+    <div class="rec-strip" id="rec-strip">
+      <div class="rec-strip-header">
+        <div class="rec-strip-title">📍 On the way — within <span id="radius-display">20</span> mi of route</div>
+        <div class="radius-row">
+          Radius:
+          <input type="range" min="5" max="60" value="20" id="radius-slider" oninput="onRadiusChange(this.value)"/>
+          <span class="radius-val" id="radius-val">20 mi</span>
+        </div>
+      </div>
+      <div class="rec-chips" id="rec-chips"></div>
+    </div>
+  </div>
+
+</div><!-- end emp-view -->
+</div><!-- end view-emp -->
+
+<!-- ── OWNER VIEW ── -->
+<div class="view" id="view-owner">
+<div class="owner-view" id="owner-content-wrap">
+  <div class="owner-header">
+    <h2>📊 Route P&amp;L — Owner Dashboard</h2>
+    <div class="topbar-spacer"></div>
+    <button class="btn-sm btn-orange" onclick="refreshOwner()">Refresh</button>
+  </div>
+  <div class="owner-kpi-bar" id="owner-kpi"></div>
+  <div class="owner-content" id="owner-routes"></div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const CFG = {
+  HCP_KEY:       '29b389a4d7834cdb9437cca8783982bd',
+  APIFY_TOKEN:   'apify_api_p5BMz7ealHBM5zg3H364zSUspodlJ41oLSpn',
+  APIFY_ACTOR:   'flow_logic_automation~flow-logic-automation---hcp-mcp',
+  GMAPS_KEY:     'AIzaSyDV9WNls0mPZPcuCZSEkyeJ9wiedU8Q2HY',
+  DEPOT:         { lat: 35.9641, lng: -83.9201, name: 'Depot — Knoxville, TN', addr: 'Knoxville, TN' },
+  FUEL_PER_MI:   0.99,
+  NEARBY_RADIUS: 20,
+  // True cost constants
+  QA_PER_JOB:      85,
+  ADMIN_PER_JOB:   315,
+  RISK_PCT:        0.10,
+  LABOR_PER_HR:    160,
+};
+const ROUTE_COLORS = ['#1D4ED8','#15803D','#C2410C','#6D28D9','#BE123C','#0E7490','#B45309'];
+const ROUTE_NAMES  = ['R1','R2','R3','R4','R5','R6','R7'];
+const TECH_DEFAULTS = ['Caden','Lucas','Sam','Spencer','Andrew','',''];
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let allJobs      = [];
+let allCustomers = [];
+let activeFilter = 'all';
+let searchQ      = '';
+let nearbyRadius = CFG.NEARBY_RADIUS;
+let leafMap      = null;
+let mapMarkers   = [];
+let routeLine    = null;
+let activeRoute  = 0;  // index into routes[]
+
+// Each route: { stops:[], driver:'', startAddr:'', endAddr:'', distanceMatrix:null }
+let routes = [{stops:[], driver:'Caden', startAddr:'', endAddr:''}];
+
+function activeStops() { return routes[activeRoute].stops; }
+
+// ═══════════════════════════════════════════════
+// APIFY / HCP
+// ═══════════════════════════════════════════════
+async function apifyHcp(operation, args = {}) {
+  const url = `https://api.apify.com/v2/acts/${CFG.APIFY_ACTOR}/run-sync-get-dataset-items`
+    + `?token=${CFG.APIFY_TOKEN}&timeout=120&memory=256`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hcpApiKey: CFG.HCP_KEY, companyTimezone: 'America/New_York', operation, args })
+  });
+  if (!res.ok) throw new Error(`Apify ${operation}: ${res.status}`);
+  const items = await res.json();
+  return items?.[0]?.result ?? null;
+}
+
+const CACHE_KEY_JOBS  = 'akino_hcp_jobs_v2';
+const CACHE_KEY_CUSTS = 'akino_hcp_custs_v2';
+const CACHE_TTL_MS    = 15 * 60 * 1000;
+
+function cacheGet(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL_MS) { localStorage.removeItem(key); return null; }
+    return data;
+  } catch { return null; }
+}
+function cacheSet(key, data) {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+async function fetchPage(op, page, pageSize) {
+  return apifyHcp(op, { page, page_size: pageSize, auto_paginate: false });
+}
+
+async function fetchJobs() {
+  const cached = cacheGet(CACHE_KEY_JOBS);
+  if (cached) { setLoadMsg('Jobs from cache ✓', 45); return cached; }
+  setLoadMsg('Fetching jobs from HCP…', 10);
+  const first = await fetchPage('hcp_get_jobs', 1, 100);
+  if (!first) return [];
+  const totalPages = first.total_pages || 1;
+  let jobs = [...(first.jobs || [])];
+  setLoadMsg(`Jobs page 1/${totalPages}`, 15);
+  if (totalPages > 1) {
+    const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    for (let i = 0; i < pages.length; i += 3) {
+      const batch = pages.slice(i, i + 3);
+      const results = await Promise.all(batch.map(p => fetchPage('hcp_get_jobs', p, 100)));
+      results.forEach(r => { if (r?.jobs) jobs = jobs.concat(r.jobs); });
+      setLoadMsg(`Jobs page ${Math.min(i+4, totalPages)}/${totalPages}`, 15 + Math.round((i+3)/totalPages*30));
+    }
+  }
+  cacheSet(CACHE_KEY_JOBS, jobs);
+  return jobs;
+}
+
+async function fetchCustomers() {
+  const cached = cacheGet(CACHE_KEY_CUSTS);
+  if (cached) { setLoadMsg('Customers from cache ✓', 90); return cached; }
+  setLoadMsg('Fetching customers from HCP…', 50);
+  const first = await fetchPage('hcp_get_customers', 1, 100);
+  if (!first) return [];
+  const totalPages = first.total_pages || 1;
+  let custs = [...(first.customers || [])];
+  if (totalPages > 1) {
+    const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    for (let i = 0; i < pages.length; i += 3) {
+      const batch = pages.slice(i, i + 3);
+      const results = await Promise.all(batch.map(p => fetchPage('hcp_get_customers', p, 100)));
+      results.forEach(r => { if (r?.customers) custs = custs.concat(r.customers); });
+      setLoadMsg(`Customers page ${Math.min(i+4, totalPages)}/${totalPages}`, 55 + Math.round((i+3)/totalPages*35));
+    }
+  }
+  cacheSet(CACHE_KEY_CUSTS, custs);
+  return custs;
+}
+
+// ═══════════════════════════════════════════════
+// GEOCODING — city lookup + Google Geocode API
+// ═══════════════════════════════════════════════
+const CITY_COORDS = {
+  // TN
+  'knoxville':{lat:35.9606,lng:-83.9207},'maryville':{lat:35.7565,lng:-84.0160},
+  'oak ridge':{lat:36.0106,lng:-84.2696},'sevierville':{lat:35.8681,lng:-83.5618},
+  'morristown':{lat:36.2137,lng:-83.2954},'kingsport':{lat:36.5484,lng:-82.5618},
+  'johnson city':{lat:36.3134,lng:-82.3535},'bristol':{lat:36.5954,lng:-82.1882},
+  'cleveland':{lat:35.1595,lng:-84.8766},'chattanooga':{lat:35.0456,lng:-85.3097},
+  'nashville':{lat:36.1627,lng:-86.7816},'cookeville':{lat:36.1628,lng:-85.5016},
+  'murfreesboro':{lat:35.8456,lng:-86.3903},'clarksville':{lat:36.5298,lng:-87.3595},
+  'jackson':{lat:35.6145,lng:-88.8139},'tullahoma':{lat:35.3620,lng:-86.2094},
+  'lenoir city':{lat:35.7948,lng:-84.2530},'loudon':{lat:35.7329,lng:-84.3338},
+  'newport':{lat:35.9676,lng:-83.1877},'greeneville':{lat:36.1637,lng:-82.8318},
+  'elizabethton':{lat:36.3487,lng:-82.2107},'athens':{lat:35.4428,lng:-84.5932},
+  'dayton':{lat:35.4928,lng:-85.0135},'harriman':{lat:35.9326,lng:-84.5560},
+  'clinton':{lat:36.1032,lng:-84.1318},'powell':{lat:36.0319,lng:-83.9698},
+  'farragut':{lat:35.8840,lng:-84.1585},'alcoa':{lat:35.7893,lng:-83.9738},
+  'madisonville':{lat:35.5162,lng:-84.3629},'sweetwater':{lat:35.6018,lng:-84.4602},
+  'etowah':{lat:35.3223,lng:-84.5316},'spring city':{lat:35.6887,lng:-84.8594},
+  'crossville':{lat:35.9490,lng:-85.0269},'mcminnville':{lat:35.6831,lng:-85.7697},
+  'sparta':{lat:35.9248,lng:-85.4650},'lafollette':{lat:36.3843,lng:-84.1207},
+  'jacksboro':{lat:36.3332,lng:-84.1897},'jellico':{lat:36.5818,lng:-84.1282},
+  'oneida':{lat:36.4934,lng:-84.5149},'wartburg':{lat:36.1026,lng:-84.5983},
+  'oliver springs':{lat:36.0421,lng:-84.3341},'rocky top':{lat:36.1599,lng:-84.1569},
+  'rutledge':{lat:36.2732,lng:-83.5229},'tazewell':{lat:36.4543,lng:-83.5679},
+  'rogersville':{lat:36.4076,lng:-82.9743},'bean station':{lat:36.3432,lng:-83.2882},
+  'white pine':{lat:36.1076,lng:-83.2935},'del rio':{lat:35.9076,lng:-83.0266},
+  'gatlinburg':{lat:35.7143,lng:-83.5121},'pigeon forge':{lat:35.7887,lng:-83.5549},
+  'townsend':{lat:35.6787,lng:-83.7380},'vonore':{lat:35.5915,lng:-84.2438},
+  'tellico plains':{lat:35.3662,lng:-84.2993},'greenback':{lat:35.6551,lng:-84.1751},
+  'seymour':{lat:35.8678,lng:-83.7413},'caryville':{lat:36.2993,lng:-84.2270},
+  'pioneer':{lat:36.4262,lng:-84.3249},'sunbright':{lat:36.2340,lng:-84.6688},
+  'lake city':{lat:36.2254,lng:-84.1607},'bulls gap':{lat:36.2615,lng:-83.0796},
+  'winfield':{lat:36.5337,lng:-84.4588},'huntsville':{lat:36.4187,lng:-84.4990},
+  // GA
+  'canton':{lat:34.2365,lng:-84.4913},'ringgold':{lat:34.9151,lng:-85.1088},
+  'dalton':{lat:34.7698,lng:-84.9702},'rome':{lat:34.2570,lng:-85.1647},
+  'cartersville':{lat:34.1651,lng:-84.7996},'marietta':{lat:33.9526,lng:-84.5499},
+  'atlanta':{lat:33.7490,lng:-84.3880},'gainesville':{lat:34.2979,lng:-83.8241},
+  'dahlonega':{lat:34.5326,lng:-83.9849},'blue ridge':{lat:34.8651,lng:-84.3238},
+  'chatsworth':{lat:34.7679,lng:-84.7688},'calhoun':{lat:34.5026,lng:-84.9513},
+  'lafayette':{lat:34.7040,lng:-85.2788},'rossville':{lat:34.9823,lng:-85.2849},
+  'murphy':{lat:35.0887,lng:-84.0169},'dalton':{lat:34.7698,lng:-84.9702},
+  // KY
+  'corbin':{lat:36.9484,lng:-84.0966},'london':{lat:37.1290,lng:-84.0832},
+  'somerset':{lat:37.0923,lng:-84.6041},'richmond':{lat:37.7479,lng:-84.2947},
+  'lexington':{lat:38.0406,lng:-84.5037},'berea':{lat:37.5687,lng:-84.2963},
+  'williamsburg':{lat:36.7437,lng:-84.1599},'barbourville':{lat:36.8676,lng:-83.8888},
+  'harlan':{lat:36.8432,lng:-83.3221},'middlesboro':{lat:36.6084,lng:-83.7174},
+  'pineville':{lat:36.7626,lng:-83.6949},'louisville':{lat:38.2527,lng:-85.7585},
+  // VA
+  'abingdon':{lat:36.7098,lng:-81.9771},'norton':{lat:36.9334,lng:-82.6293},
+  'wise':{lat:36.9754,lng:-82.5763},'grundy':{lat:37.2701,lng:-82.0985},
+  'lebanon':{lat:36.8968,lng:-82.0757},
+  // NC
+  'asheville':{lat:35.5951,lng:-82.5515},'andrews':{lat:35.2037,lng:-83.8213},
+  'bryson city':{lat:35.4279,lng:-83.4488},'murphy':{lat:35.0887,lng:-84.0169},
+};
+
+const geocodeCache = {};
+
+async function geocodeAddress(addr) {
+  if (!addr) return null;
+  if (geocodeCache[addr]) return geocodeCache[addr];
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addr)}&key=${CFG.GMAPS_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status === 'OK' && data.results[0]) {
+      const loc = data.results[0].geometry.location;
+      geocodeCache[addr] = { lat: loc.lat, lng: loc.lng, precise: true };
+      return geocodeCache[addr];
+    }
+  } catch {}
+  return null;
+}
+
+function cityCoord(city, state) {
+  if (!city) return { lat: CFG.DEPOT.lat, lng: CFG.DEPOT.lng, approx: false };
+  const key = city.toLowerCase().trim();
+  const c = CITY_COORDS[key];
+  if (c) return { lat: c.lat, lng: c.lng, approx: true };
+  return { lat: CFG.DEPOT.lat + (Math.random()-.5)*.4, lng: CFG.DEPOT.lng + (Math.random()-.5)*.4, approx: false };
+}
+
+// ═══════════════════════════════════════════════
+// NORMALISE HCP DATA
+// ═══════════════════════════════════════════════
+function normaliseJob(j) {
+  const c = j.customer || {};
+  const a = j.address || {};
+  const addrStr = [a.street, a.city, a.state, a.zip].filter(Boolean).join(', ');
+
+  // Use HCP's real lat/lng if available (stored in address or geo fields)
+  const hcpLat = parseFloat(a.latitude  || a.lat || j.latitude  || j.lat  || 0);
+  const hcpLng = parseFloat(a.longitude || a.lng || j.longitude || j.lng  || 0);
+  const hasReal = hcpLat !== 0 && hcpLng !== 0;
+
+  // Fallback: city centroid
+  const fallback = cityCoord(a.city, a.state);
+
+  return {
+    id:          j.id,
+    num:         j.invoice_number || j.job_number || j.id,
+    name:        [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || c.company || 'Unknown',
+    addr:        addrStr || (a.city ? `${a.city}, ${a.state}` : 'No address'),
+    street:      a.street || '',
+    city:        a.city || '',
+    state:       a.state || '',
+    zip:         a.zip || '',
+    status:      j.work_status || 'unknown',
+    scheduledAt: j.schedule?.scheduled_start || null,
+    amount:      (j.total_amount || 0) / 100,
+    techs:       (j.assigned_employees || []).map(e => e.first_name).filter(Boolean),
+    jobType:     j.job_fields?.job_type?.name || '',
+    description: j.description || '',
+    phone:       c.mobile_number || c.home_number || '',
+    notes:       (j.notes || []).map(n => n.content).join(' | ').slice(0, 120),
+    lat:         hasReal ? hcpLat : fallback.lat,
+    lng:         hasReal ? hcpLng : fallback.lng,
+    hasCoord:    hasReal || fallback.approx,
+    gmapsLink:   addrStr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addrStr)}` : null,
+  };
+}
+
+function normaliseCustomer(c) {
+  const a = (c.addresses || [])[0] || {};
+  const addrStr = [a.street, a.city, a.state, a.zip].filter(Boolean).join(', ');
+
+  const hcpLat = parseFloat(a.latitude  || a.lat || c.latitude  || c.lat  || 0);
+  const hcpLng = parseFloat(a.longitude || a.lng || c.longitude || c.lng  || 0);
+  const hasReal = hcpLat !== 0 && hcpLng !== 0;
+  const fallback = cityCoord(a.city, a.state);
+
+  return {
+    id:    c.id,
+    name:  [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || c.company || 'Customer',
+    addr:  addrStr || '',
+    city:  a.city || '',
+    state: a.state || '',
+    phone: c.mobile_number || c.home_number || '',
+    lat:   hasReal ? hcpLat : fallback.lat,
+    lng:   hasReal ? hcpLng : fallback.lng,
+    hasCoord: hasReal || fallback.approx,
+    gmapsLink: addrStr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addrStr)}` : null,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// DISTANCE HELPERS
+// ═══════════════════════════════════════════════
+function haversine(a, b) {
+  const R = 3958.8;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(s));
+}
+
+// Google Maps Distance Matrix (real road miles + seconds)
+async function getDistanceMatrix(origins, destinations) {
+  try {
+    const o = origins.map(p => `${p.lat},${p.lng}`).join('|');
+    const d = destinations.map(p => `${p.lat},${p.lng}`).join('|');
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(o)}&destinations=${encodeURIComponent(d)}&units=imperial&key=${CFG.GMAPS_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data;
+  } catch { return null; }
+}
+
+// Convert seconds → "Xhr Ymin"
+function secsToStr(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
+// ═══════════════════════════════════════════════
+// NEARBY DETECTION
+// ═══════════════════════════════════════════════
+function getRouteCorridor() {
+  const stops = activeStops();
+  if (!stops.length) return [];
+  const pts = [getStartPoint(), ...stops, getEndPoint()];
+  return pts;
+}
+
+function getStartPoint() {
+  const r = routes[activeRoute];
+  if (r.startAddr) {
+    const coords = geocodeCache[r.startAddr];
+    if (coords) return coords;
+  }
+  return CFG.DEPOT;
+}
+
+function getEndPoint() {
+  const r = routes[activeRoute];
+  if (r.endAddr) {
+    const coords = geocodeCache[r.endAddr];
+    if (coords) return coords;
+  }
+  return CFG.DEPOT;
+}
+
+function pointToSegmentDist(pt, a, b) {
+  // Distance from pt to line segment a-b (in miles using haversine approx)
+  const dx = b.lng - a.lng, dy = b.lat - a.lat;
+  if (dx === 0 && dy === 0) return haversine(pt, a);
+  const t = Math.max(0, Math.min(1, ((pt.lng - a.lng)*dx + (pt.lat - a.lat)*dy) / (dx*dx + dy*dy)));
+  return haversine(pt, { lat: a.lat + t*dy, lng: a.lng + t*dx });
+}
+
+function minDistToRoute(pt, corridor) {
+  if (corridor.length === 0) return Infinity;
+  if (corridor.length === 1) return haversine(pt, corridor[0]);
+  let minD = Infinity;
+  for (let i = 0; i < corridor.length - 1; i++) {
+    minD = Math.min(minD, pointToSegmentDist(pt, corridor[i], corridor[i+1]));
+  }
+  return minD;
+}
+
+function getNearbyIds() {
+  const corridor = getRouteCorridor();
+  const stopIds  = new Set(activeStops().map(s => s.id));
+  const nearbyJobs = new Set();
+  const nearbyCusts = new Set();
+  if (!corridor.length) return { jobs: nearbyJobs, custs: nearbyCusts };
+  allJobs.forEach(j => {
+    if (stopIds.has(j.id)) return;
+    if (j.status === 'pro canceled' || j.status === 'canceled') return;
+    if (minDistToRoute(j, corridor) <= nearbyRadius) nearbyJobs.add(j.id);
+  });
+  allCustomers.forEach(c => {
+    if (minDistToRoute(c, corridor) <= nearbyRadius) nearbyCusts.add(c.id);
+  });
+  return { jobs: nearbyJobs, custs: nearbyCusts };
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+async function init() {
+  initMap();
+  renderRouteTabs();
+  renderRouteStops();
+  setLoadMsg('Connecting to HCP via Apify…', 5);
+
+  const hasToken = CFG.APIFY_TOKEN && CFG.APIFY_TOKEN !== 'YOUR_APIFY_TOKEN_HERE';
+
+  if (!hasToken) {
+    loadDemo();
+    setStatus('demo', '🟡 Demo — add Apify token to go live');
+    hideLoading();
+    return;
+  }
+
+  try {
+    const [rawJobs, rawCustomers] = await Promise.all([fetchJobs(), fetchCustomers()]);
+    allJobs      = rawJobs.map(normaliseJob);
+    allCustomers = rawCustomers.map(normaliseCustomer);
+    setStatus('live', `${allJobs.length} jobs · ${allCustomers.length} customers`);
+    setLoadMsg('Done!', 100);
+    setTimeout(hideLoading, 300);
+  } catch (err) {
+    console.warn('HCP fetch failed:', err);
+    loadDemo();
+    setStatus('demo', '⚠ Demo — API error');
+    hideLoading();
+    toast('Could not reach HCP — showing demo data');
+  }
+
+  renderJobList();
+  updateMap();
+  updateCounts();
+}
+
+// ═══════════════════════════════════════════════
+// DEMO DATA
+// ═══════════════════════════════════════════════
+function loadDemo() {
+  allJobs = [
+    {id:'j1',num:'789',name:'Antwane Cross',addr:'1488 Mckinley Ct, Clarksville, TN 37042',street:'1488 Mckinley Ct',city:'Clarksville',state:'TN',zip:'37042',status:'needs scheduling',scheduledAt:null,amount:0,techs:[],jobType:'Diagnostic',description:'Diagnostic Visit',phone:'270-348-1065',notes:'',lat:36.5298,lng:-87.3595,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=1488+Mckinley+Ct+Clarksville+TN'},
+    {id:'j2',num:'788',name:'Ken Maslowski',addr:'1923 Country Club Dr, Tullahoma, TN 37388',street:'1923 Country Club Dr',city:'Tullahoma',state:'TN',zip:'37388',status:'scheduled',scheduledAt:'2026-04-19T01:15:00',amount:0,techs:['Cory'],jobType:'',description:'',phone:'630-640-6113',notes:'',lat:35.3620,lng:-86.2094,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=1923+Country+Club+Dr+Tullahoma+TN'},
+    {id:'j3',num:'787',name:'Adam Rivette',addr:'307 Vista Ct, Canton, GA 30114',street:'307 Vista Ct',city:'Canton',state:'GA',zip:'30114',status:'needs scheduling',scheduledAt:null,amount:0,techs:[],jobType:'',description:'',phone:'917-828-4450',notes:'Service from Generac',lat:34.2365,lng:-84.4913,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=307+Vista+Ct+Canton+GA'},
+    {id:'j4',num:'786',name:'Donal Tallwater',addr:'558 Turkey Creek Rd, Tullahoma, TN 37388',street:'558 Turkey Creek Rd',city:'Tullahoma',state:'TN',zip:'37388',status:'needs scheduling',scheduledAt:null,amount:0,techs:[],jobType:'',description:'',phone:'931-607-1262',notes:'Generac warranty issue',lat:35.368,lng:-86.215,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=558+Turkey+Creek+Rd+Tullahoma+TN'},
+    {id:'j5',num:'784',name:'Thomas Hale',addr:'526 Smoketree Cir, Ringgold, GA 30736',street:'526 Smoketree Cir',city:'Ringgold',state:'GA',zip:'30736',status:'scheduled',scheduledAt:'2026-04-23T12:00:00',amount:0,techs:['Caden'],jobType:'',description:'Solar Panel Removal',phone:'706-847-2186',notes:'Roofers Apr 24 — MUST remove Apr 23',lat:34.9151,lng:-85.1088,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=526+Smoketree+Cir+Ringgold+GA'},
+    {id:'j6',num:'783',name:'Collette Romero',addr:'552 Rock Hill Rd, Newport, TN 37821',street:'552 Rock Hill Rd',city:'Newport',state:'TN',zip:'37821',status:'needs scheduling',scheduledAt:null,amount:0,techs:[],jobType:'Diagnostic',description:'Diagnostic Visit',phone:'754-204-6785',notes:'Generac / Maxion panel issue',lat:35.9676,lng:-83.1877,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=552+Rock+Hill+Rd+Newport+TN'},
+    {id:'j7',num:'771',name:'Kenyon Peterson',addr:'415 Iroquois Dr, Knoxville, TN 37914',street:'415 Iroquois Dr',city:'Knoxville',state:'TN',zip:'37914',status:'needs scheduling',scheduledAt:null,amount:0,techs:[],jobType:'Repair',description:'Service Visit',phone:'',notes:'Battery fuse replace XVT07-13530',lat:35.9606,lng:-83.9207,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=415+Iroquois+Dr+Knoxville+TN'},
+    {id:'j8',num:'769',name:'Antwane Cross (Reinstall)',addr:'1488 Mckinley Ct, Clarksville, TN 37042',street:'1488 Mckinley Ct',city:'Clarksville',state:'TN',zip:'37042',status:'scheduled',scheduledAt:'2026-04-15T09:00:00',amount:5200,techs:['Caden'],jobType:'',description:'Solar Panel Re-Install',phone:'270-348-1065',notes:'Roof replaced — reinstall only',lat:36.5298,lng:-87.3595,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=1488+Mckinley+Ct+Clarksville+TN'},
+    {id:'j9',num:'767',name:'Chris Cetin',addr:'2657 Bakertown Rd, Knoxville, TN 37931',street:'2657 Bakertown Rd',city:'Knoxville',state:'TN',zip:'37931',status:'in progress',scheduledAt:'2026-03-26T12:00:00',amount:483.04,techs:['Caden'],jobType:'',description:'GENERAC Troubleshooting',phone:'714-930-4382',notes:'Generac denied — customer approved site visit',lat:35.9606,lng:-83.9207,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=2657+Bakertown+Rd+Knoxville+TN'},
+    {id:'j10',num:'766',name:'Rachel Williams',addr:'1930 Benton Pike NE, Cleveland, TN 37323',street:'1930 Benton Pike NE',city:'Cleveland',state:'TN',zip:'37323',status:'scheduled',scheduledAt:'2026-04-08T10:00:00',amount:0,techs:['Caden'],jobType:'',description:'System Install at New Home',phone:'423-667-8493',notes:'',lat:35.1595,lng:-84.8766,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=1930+Benton+Pike+NE+Cleveland+TN'},
+    {id:'j11',num:'782',name:'Andrew Schlueter',addr:'Palermo Rd, Knoxville, TN 37918',street:'Palermo Rd',city:'Knoxville',state:'TN',zip:'37918',status:'scheduled',scheduledAt:'2026-04-27T11:00:00',amount:1018,techs:['Caden'],jobType:'',description:'Dual power meter install',phone:'',notes:'Plug in solar kit — see attachments',lat:35.9606,lng:-83.9207,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=Palermo+Rd+Knoxville+TN'},
+  ];
+  allCustomers = [
+    {id:'c1',name:'Nicole Alban',addr:'704 Whittmore Ln, Knoxville, TN',city:'Knoxville',state:'TN',phone:'269-352-6182',lat:35.9606,lng:-83.9207,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=704+Whittmore+Ln+Knoxville+TN'},
+    {id:'c2',name:'Jeff Adams',addr:'1029 Maple Lane, Greenback, TN',city:'Greenback',state:'TN',phone:'',lat:35.6551,lng:-84.1751,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=1029+Maple+Lane+Greenback+TN'},
+    {id:'c3',name:'Randall Rice',addr:'2109 West Madison St, Louisville, KY',city:'Louisville',state:'KY',phone:'',lat:38.2527,lng:-85.7585,hasCoord:true,gmapsLink:'https://www.google.com/maps/search/?api=1&query=2109+West+Madison+St+Louisville+KY'},
+  ];
+  renderJobList();
+  updateMap();
+  updateCounts();
+}
+
+// ═══════════════════════════════════════════════
+// JOB LIST RENDER
+// ═══════════════════════════════════════════════
+function renderJobList() {
+  const list    = document.getElementById('job-list');
+  const allRouteIds = new Set(routes.flatMap(r => r.stops.map(s => s.id)));
+  const nearbyIds   = getNearbyIds();
+  const q = searchQ.toLowerCase();
+
+  let jobs = allJobs.filter(j => {
+    if (j.status === 'pro canceled' || j.status === 'canceled') return false;
+    if (q) {
+      const hay = `${j.name} ${j.addr} ${j.num} ${j.city} ${j.description} ${j.jobType}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (activeFilter === 'needs scheduling') return j.status === 'needs scheduling';
+    if (activeFilter === 'scheduled') return j.status === 'scheduled' || j.status === 'in progress';
+    if (activeFilter === 'nearby') return nearbyIds.jobs.has(j.id);
+    return true;
+  });
+
+  if (!jobs.length) {
+    list.innerHTML = '<div class="no-results">No jobs match your search.</div>';
+    return;
+  }
+
+  const unsched = jobs.filter(j => j.status === 'needs scheduling');
+  const sched   = jobs.filter(j => j.status === 'scheduled' || j.status === 'in progress');
+  const other   = jobs.filter(j => !['needs scheduling','scheduled','in progress'].includes(j.status));
+
+  let html = '';
+  if (unsched.length) { html += `<div class="section-label">Needs Scheduling (${unsched.length})</div>`; unsched.forEach(j => { html += jobRow(j, allRouteIds, nearbyIds.jobs); }); }
+  if (sched.length)   { html += `<div class="section-label">Scheduled (${sched.length})</div>`;   sched.forEach(j => { html += jobRow(j, allRouteIds, nearbyIds.jobs); }); }
+  if (other.length)   { html += `<div class="section-label">Other (${other.length})</div>`;   other.forEach(j => { html += jobRow(j, allRouteIds, nearbyIds.jobs); }); }
+  list.innerHTML = html;
+}
+
+function jobRow(j, routeIds, nearbyIds) {
+  const inRoute  = routeIds.has(j.id);
+  const isNearby = nearbyIds.has(j.id) && !inRoute;
+  const cls      = inRoute ? 'in-route' : isNearby ? 'nearby' : '';
+  const check    = inRoute ? '✓' : '';
+
+  // Find which route this stop is on
+  let routeBadge = '';
+  if (inRoute) {
+    routes.forEach((r, i) => {
+      if (r.stops.find(s => s.id === j.id)) {
+        routeBadge = `<span class="tag" style="background:${ROUTE_COLORS[i]}20;color:${ROUTE_COLORS[i]}">${ROUTE_NAMES[i]}</span>`;
+      }
+    });
+  }
+
+  const statusTag = j.status === 'needs scheduling'
+    ? `<span class="tag tag-orange">Unsched</span>`
+    : j.status === 'scheduled'
+    ? `<span class="tag tag-blue">Sched</span>`
+    : j.status === 'in progress'
+    ? `<span class="tag tag-green">In Progress</span>`
+    : `<span class="tag tag-gray">${j.status}</span>`;
+
+  const amtTag   = j.amount > 0 ? `<span class="tag tag-green">$${j.amount.toLocaleString()}</span>` : '';
+  const techTag  = j.techs.length ? `<span class="tag tag-gray">${j.techs[0]}</span>` : '';
+  const typeTag  = j.jobType ? `<span class="tag tag-purple">${j.jobType}</span>` : '';
+  const nearTag  = isNearby ? `<span class="tag tag-yellow">📍 Nearby</span>` : '';
+  const mapLink  = j.gmapsLink ? `<a class="job-maplink" href="${j.gmapsLink}" target="_blank" onclick="event.stopPropagation()">🗺 Map</a>` : '';
+  const dateTxt  = j.scheduledAt ? `<span class="tag tag-gray">${new Date(j.scheduledAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>` : '';
+
+  return `<div class="job-row ${cls}" onclick="toggleJobInRoute(${JSON.stringify(j.id)})">
+    <div class="job-check">${check}</div>
+    <div class="job-info">
+      <div class="job-name">#${j.num} — ${j.name}</div>
+      <div class="job-addr">${j.addr}</div>
+      <div class="job-tags">${statusTag}${dateTxt}${amtTag}${techTag}${typeTag}${nearTag}${routeBadge}${mapLink}</div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+// FILTER / SEARCH
+// ═══════════════════════════════════════════════
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderJobList();
+}
+function filterJobs() { searchQ = document.getElementById('search').value; renderJobList(); }
+
+function updateCounts() {
+  const nearbyIds = getNearbyIds();
+  const allActive = allJobs.filter(j => j.status !== 'pro canceled' && j.status !== 'canceled');
+  document.getElementById('cnt-all').textContent     = allActive.length;
+  document.getElementById('cnt-unsched').textContent = allActive.filter(j => j.status === 'needs scheduling').length;
+  document.getElementById('cnt-sched').textContent   = allActive.filter(j => j.status === 'scheduled' || j.status === 'in progress').length;
+  document.getElementById('cnt-nearby').textContent  = nearbyIds.jobs.size;
+}
+
+// ═══════════════════════════════════════════════
+// MULTI-ROUTE MANAGEMENT
+// ═══════════════════════════════════════════════
+function renderRouteTabs() {
+  const container = document.getElementById('rp-tabs');
+  let html = routes.map((r, i) => {
+    const n = r.stops.length;
+    const cls = `route-tab rt-r${(i%5)+1}${i === activeRoute ? ' active' : ''}`;
+    return `<div class="${cls}" onclick="switchRoute(${i})">${ROUTE_NAMES[i]} ${r.driver ? `(${r.driver})` : ''} <span style="opacity:.7">${n > 0 ? n+'✓' : ''}</span></div>`;
+  }).join('');
+  // Add new route button
+  if (routes.length < 7) {
+    html += `<div class="route-tab rt-add" onclick="addNewRoute()">+ Route</div>`;
+  }
+  container.innerHTML = html;
+
+  // Sync config fields
+  const r = routes[activeRoute];
+  document.getElementById('rc-driver').value = r.driver || '';
+  document.getElementById('rc-start').value  = r.startAddr || '';
+  document.getElementById('rc-end').value    = r.endAddr || '';
+}
+
+function switchRoute(i) {
+  activeRoute = i;
+  renderRouteTabs();
+  renderRouteStops();
+  updateMap();
+  updateCounts();
+  renderJobList();
+}
+
+function addNewRoute() {
+  if (routes.length >= 7) return;
+  const defaultDrivers = ['','Lucas','Sam','Spencer','Andrew','Katie','Lex'];
+  routes.push({ stops: [], driver: defaultDrivers[routes.length] || '', startAddr: '', endAddr: '' });
+  activeRoute = routes.length - 1;
+  renderRouteTabs();
+  renderRouteStops();
+  updateMap();
+  renderJobList();
+  toast(`Route ${ROUTE_NAMES[activeRoute]} created`);
+}
+
+function updateRouteConfig() {
+  const r = routes[activeRoute];
+  r.driver   = document.getElementById('rc-driver').value;
+  r.startAddr = document.getElementById('rc-start').value;
+  r.endAddr   = document.getElementById('rc-end').value;
+  renderRouteTabs();
+}
+
+function toggleJobInRoute(id) {
+  const job = allJobs.find(j => j.id === id);
+  if (!job) return;
+  const stops = routes[activeRoute].stops;
+  const idx = stops.findIndex(s => s.id === id);
+  if (idx >= 0) {
+    stops.splice(idx, 1);
+  } else {
+    stops.push({ ...job });
+  }
+  renderRouteStops();
+  renderJobList();
+  updateMap();
+  updateCounts();
+  updateRecStrip();
+}
+
+function removeStop(i) {
+  routes[activeRoute].stops.splice(i, 1);
+  renderRouteStops();
+  renderJobList();
+  updateMap();
+  updateCounts();
+  updateRecStrip();
+}
+
+function clearCurrentRoute() {
+  routes[activeRoute].stops = [];
+  renderRouteStops();
+  renderJobList();
+  updateMap();
+  updateCounts();
+  document.getElementById('rec-strip').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════
+// ROUTE STOPS RENDER
+// ═══════════════════════════════════════════════
+function renderRouteStops() {
+  const stops   = activeStops();
+  const color   = ROUTE_COLORS[activeRoute];
+  const stopsEl = document.getElementById('rp-stops');
+  const sumEl   = document.getElementById('rp-summary');
+  const btnOpt  = document.getElementById('btn-optimize');
+  const btnMaps = document.getElementById('btn-maps');
+
+  btnOpt.disabled  = stops.length < 2;
+  btnMaps.disabled = stops.length === 0;
+
+  if (!stops.length) {
+    stopsEl.innerHTML = '<div class="rp-empty">Tap a job to add it to the active route</div>';
+    sumEl.style.display = 'none';
+    return;
+  }
+
+  const r = routes[activeRoute];
+  const startLabel = r.startAddr || CFG.DEPOT.name;
+  const endLabel   = r.endAddr   || CFG.DEPOT.name;
+
+  let html = `<div class="rp-stop">
+    <div class="stop-num depot-dot">▶</div>
+    <div class="stop-body"><div class="stop-name">${startLabel}</div></div>
+  </div>`;
+
+  let totalMi = 0, totalSecs = 0;
+  let prev = r.startAddr ? (geocodeCache[r.startAddr] || CFG.DEPOT) : CFG.DEPOT;
+
+  stops.forEach((s, i) => {
+    const dist = haversine(prev, s);
+    totalMi += dist;
+    const estMins = Math.round(dist / 50 * 60); // ~50mph avg
+    totalSecs += estMins * 60;
+    prev = s;
+    const mapLink = s.gmapsLink ? `<a class="stop-maplink" href="${s.gmapsLink}" target="_blank" onclick="event.stopPropagation()">🗺</a>` : '';
+    html += `<div class="rp-stop">
+      <div class="stop-num" style="background:${color}">${i+1}</div>
+      <div class="stop-body">
+        <div class="stop-name">#${s.num} — ${s.name}${mapLink}</div>
+        <div class="stop-leg">~${dist.toFixed(1)} mi from prev · est. ${estMins} min drive</div>
+      </div>
+      <button class="stop-x" onclick="removeStop(${i})">×</button>
+    </div>`;
+  });
+
+  // End point
+  const endPt = r.endAddr ? (geocodeCache[r.endAddr] || CFG.DEPOT) : CFG.DEPOT;
+  const lastLeg = haversine(prev, endPt);
+  totalMi += lastLeg;
+  html += `<div class="rp-stop">
+    <div class="stop-num end-dot">⏹</div>
+    <div class="stop-body">
+      <div class="stop-name">${endLabel}</div>
+      <div class="stop-leg">~${lastLeg.toFixed(1)} mi return</div>
+    </div>
+  </div>`;
+
+  stopsEl.innerHTML = html;
+
+  // Summary
+  const totalRev = stops.reduce((s, j) => s + (j.amount || 0), 0);
+  document.getElementById('s-stops').textContent = stops.length;
+  document.getElementById('s-miles').textContent = totalMi.toFixed(1);
+  document.getElementById('s-time').textContent  = secsToStr(totalSecs);
+  document.getElementById('s-fuel').textContent  = '$' + Math.round(totalMi * CFG.FUEL_PER_MI);
+  document.getElementById('s-rev').textContent   = totalRev > 0 ? '$' + totalRev.toLocaleString() : '—';
+  sumEl.style.display = 'grid';
+}
+
+// ═══════════════════════════════════════════════
+// OPTIMIZE (nearest-neighbor from start point)
+// ═══════════════════════════════════════════════
+async function optimizeCurrentRoute() {
+  const stops = activeStops();
+  if (stops.length < 2) return;
+  toast('Optimizing route…');
+
+  const r    = routes[activeRoute];
+  let origin = r.startAddr ? (geocodeCache[r.startAddr] || CFG.DEPOT) : CFG.DEPOT;
+
+  // Nearest-neighbor greedy
+  let remaining = [...stops];
+  let ordered   = [];
+  let current   = origin;
+
+  while (remaining.length) {
+    let bestIdx = 0, bestDist = Infinity;
+    remaining.forEach((s, i) => {
+      const d = haversine(current, s);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    ordered.push(remaining[bestIdx]);
+    current = remaining[bestIdx];
+    remaining.splice(bestIdx, 1);
+  }
+
+  routes[activeRoute].stops = ordered;
+  renderRouteStops();
+  updateMap();
+  updateRecStrip();
+  updateCounts();
+  renderJobList();
+  toast(`Route optimized — ${ordered.length} stops`);
+}
+
+// ═══════════════════════════════════════════════
+// GOOGLE MAPS EXPORT
+// ═══════════════════════════════════════════════
+function openMapsCurrentRoute() {
+  const stops = activeStops();
+  if (!stops.length) return;
+  const r         = routes[activeRoute];
+  const origin    = encodeURIComponent(r.startAddr || CFG.DEPOT.addr);
+  const dest      = encodeURIComponent(r.endAddr   || CFG.DEPOT.addr);
+  const waypoints = stops.map(s => encodeURIComponent(s.addr)).join('|');
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════
+// RECOMMENDATIONS STRIP
+// ═══════════════════════════════════════════════
+function updateRecStrip() {
+  const stops = activeStops();
+  const strip = document.getElementById('rec-strip');
+  if (!stops.length) { strip.style.display = 'none'; return; }
+
+  const nearby  = getNearbyIds();
+  const stopIds = new Set(stops.map(s => s.id));
+
+  const nearJobs  = allJobs.filter(j => nearby.jobs.has(j.id) && !stopIds.has(j.id)).slice(0, 12);
+  const nearCusts = allCustomers.filter(c => nearby.custs.has(c.id)).slice(0, 8);
+
+  if (!nearJobs.length && !nearCusts.length) { strip.style.display = 'none'; return; }
+
+  strip.style.display = 'block';
+  document.getElementById('radius-display').textContent = nearbyRadius;
+  document.getElementById('radius-val').textContent     = nearbyRadius + ' mi';
+
+  let chips = '';
+  nearJobs.forEach(j => {
+    const cls  = j.status === 'needs scheduling' ? 'chip-unsched' : 'chip-sched';
+    const icon = j.status === 'needs scheduling' ? '🔴' : '🔵';
+    chips += `<div class="rec-chip ${cls}" onclick="toggleJobInRoute(${JSON.stringify(j.id)})" title="${j.addr}">${icon} #${j.num} ${j.name}</div>`;
+  });
+  nearCusts.forEach(c => {
+    chips += `<div class="rec-chip chip-customer" title="${c.addr}">👤 ${c.name}</div>`;
+  });
+  document.getElementById('rec-chips').innerHTML = chips || '<div class="chip-more">No nearby jobs or customers found</div>';
+}
+
+function onRadiusChange(val) {
+  nearbyRadius = parseInt(val);
+  document.getElementById('radius-display').textContent = val;
+  document.getElementById('radius-val').textContent     = val + ' mi';
+  updateRecStrip();
+  updateCounts();
+  renderJobList();
+}
+
+// ═══════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════
+function initMap() {
+  leafMap = L.map('map', { zoomControl: true }).setView([36.2, -84.5], 7);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri © OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(leafMap);
+
+  // Depot marker
+  L.circleMarker([CFG.DEPOT.lat, CFG.DEPOT.lng], {
+    radius: 10, fillColor: '#334155', color: 'white', weight: 2, fillOpacity: 1
+  }).addTo(leafMap).bindPopup('<b>Depot</b><br>Knoxville, TN');
+}
+
+function updateMap() {
+  // Clear old markers + line
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+  if (routeLine) { routeLine.remove(); routeLine = null; }
+
+  // All jobs as small dots
+  allJobs.forEach(j => {
+    if (!j.lat || !j.lng) return;
+    if (j.status === 'pro canceled' || j.status === 'canceled') return;
+    const color = j.status === 'needs scheduling' ? '#F97316'
+                : j.status === 'in progress' ? '#22C55E'
+                : '#3B82F6';
+    const m = L.circleMarker([j.lat, j.lng], {
+      radius: 5, fillColor: color, color: 'white', weight: 1.5, fillOpacity: 0.8
+    }).addTo(leafMap);
+    m.bindPopup(`<b>#${j.num} — ${j.name}</b><br>${j.addr}<br><span style="color:#64748B">${j.status}</span>${j.gmapsLink ? `<br><a href="${j.gmapsLink}" target="_blank">Open in Maps</a>` : ''}`);
+    mapMarkers.push(m);
+  });
+
+  // Route stops + line for each route
+  const allLatlngs = [];
+  routes.forEach((r, ri) => {
+    if (!r.stops.length) return;
+    const color = ROUTE_COLORS[ri];
+    const start = r.startAddr ? (geocodeCache[r.startAddr] || CFG.DEPOT) : CFG.DEPOT;
+    const end   = r.endAddr   ? (geocodeCache[r.endAddr]   || CFG.DEPOT) : CFG.DEPOT;
+    const pts   = [start, ...r.stops, end];
+    const latlngs = pts.map(p => [p.lat, p.lng]);
+    allLatlngs.push(...latlngs);
+    const line = L.polyline(latlngs, { color, weight: 3, opacity: 0.85, dashArray: null }).addTo(leafMap);
+    mapMarkers.push(line);
+
+    // Numbered markers for stops
+    r.stops.forEach((s, i) => {
+      const icon = L.divIcon({
+        html: `<div style="background:${color};color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)">${i+1}</div>`,
+        className: '', iconSize: [24, 24], iconAnchor: [12, 12],
+      });
+      const m = L.marker([s.lat, s.lng], { icon }).addTo(leafMap);
+      m.bindPopup(`<b>${ROUTE_NAMES[ri]}-${i+1}: #${s.num} — ${s.name}</b><br>${s.addr}${s.gmapsLink ? `<br><a href="${s.gmapsLink}" target="_blank">Open in Maps</a>` : ''}`);
+      mapMarkers.push(m);
+    });
+  });
+}
+
+function fitAll() {
+  const pts = allJobs.filter(j => j.lat && j.lng && j.status !== 'pro canceled' && j.status !== 'canceled');
+  if (pts.length) leafMap.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [30,30] });
+}
+
+function fitRoute() {
+  const stops = activeStops();
+  if (!stops.length) return;
+  const r = routes[activeRoute];
+  const pts = [r.startAddr ? (geocodeCache[r.startAddr] || CFG.DEPOT) : CFG.DEPOT, ...stops, r.endAddr ? (geocodeCache[r.endAddr] || CFG.DEPOT) : CFG.DEPOT];
+  leafMap.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [40,40] });
+}
+
+// ═══════════════════════════════════════════════
+// OWNER VIEW
+// ═══════════════════════════════════════════════
+function refreshOwner() { renderOwnerView(); }
+
+function switchView(name, el) {
+  document.querySelectorAll('.toptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-emp').style.display    = name === 'emp'   ? 'flex' : 'none';
+  document.getElementById('view-owner').style.display  = name === 'owner' ? 'flex' : 'none';
+  if (name === 'owner') renderOwnerView();
+}
+
+function calcTrueCost(stops, totalMi) {
+  // Labor: $160/hr, assume 2hr avg per stop
+  const labor = stops.length * 2 * CFG.LABOR_PER_HR;
+  const fuel  = totalMi * CFG.FUEL_PER_MI;
+  const qa    = stops.length * CFG.QA_PER_JOB;
+  const admin = stops.length * CFG.ADMIN_PER_JOB;
+  const subtotal = labor + fuel + qa + admin;
+  const risk  = subtotal * CFG.RISK_PCT;
+  return { labor, fuel, qa, admin, risk, total: subtotal + risk };
+}
+
+function renderOwnerView() {
+  const hasRoutes = routes.some(r => r.stops.length > 0);
+  const kpiEl     = document.getElementById('owner-kpi');
+  const routesEl  = document.getElementById('owner-routes');
+
+  if (!hasRoutes) {
+    kpiEl.innerHTML = '';
+    routesEl.innerHTML = '<div style="padding:40px;text-align:center;color:#94A3B8">Build routes in the Route Builder tab first, then come back here to see P&L.</div>';
+    return;
+  }
+
+  let totalRevAll = 0, totalCostAll = 0, totalMiAll = 0, totalStopsAll = 0;
+
+  const cards = routes.filter(r => r.stops.length > 0).map((r, i) => {
+    const ri    = routes.indexOf(r);
+    const color = ROUTE_COLORS[ri];
+    const name  = ROUTE_NAMES[ri];
+    const start = r.startAddr ? (geocodeCache[r.startAddr] || CFG.DEPOT) : CFG.DEPOT;
+    const end   = r.endAddr   ? (geocodeCache[r.endAddr]   || CFG.DEPOT) : CFG.DEPOT;
+    const pts   = [start, ...r.stops, end];
+
+    let totalMi = 0;
+    for (let i = 0; i < pts.length - 1; i++) totalMi += haversine(pts[i], pts[i+1]);
+
+    const totalRev  = r.stops.reduce((s, j) => s + (j.amount || 0), 0);
+    const costs     = calcTrueCost(r.stops, totalMi);
+    const profit    = totalRev - costs.total;
+    const isProfitable = profit >= 0;
+
+    totalRevAll   += totalRev;
+    totalCostAll  += costs.total;
+    totalMiAll    += totalMi;
+    totalStopsAll += r.stops.length;
+
+    const verdictCls = isProfitable ? 'verdict-profit' : 'verdict-loss';
+    const verdictTxt = isProfitable ? `✅ Profitable +$${profit.toLocaleString(undefined,{maximumFractionDigits:0})}` : `❌ Loss -$${Math.abs(profit).toLocaleString(undefined,{maximumFractionDigits:0})}`;
+    const pillCls    = isProfitable ? 'pill-profit' : 'pill-loss';
+
+    let rows = r.stops.map((s, si) => {
+      const prev  = si === 0 ? start : r.stops[si-1];
+      const legMi = haversine(prev, s);
+      const stopCost = (2 * CFG.LABOR_PER_HR) + (legMi * CFG.FUEL_PER_MI) + CFG.QA_PER_JOB + CFG.ADMIN_PER_JOB;
+      const stopProfit = (s.amount || 0) - stopCost;
+      const mapCell    = s.gmapsLink ? `<a href="${s.gmapsLink}" target="_blank">🗺 Map</a>` : '—';
+      return `<tr>
+        <td class="td-num">${si+1}</td>
+        <td><b>#${s.num}</b> ${s.name}</td>
+        <td>${s.city}, ${s.state}</td>
+        <td>${legMi.toFixed(1)} mi</td>
+        <td>${s.amount > 0 ? '$'+s.amount.toLocaleString() : '—'}</td>
+        <td class="${stopProfit >= 0 ? 'td-profit' : 'td-loss'}">${stopProfit >= 0 ? '+' : ''}$${stopProfit.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+        <td class="td-maplink">${mapCell}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="owner-route-card">
+      <div class="orc-header">
+        <div class="orc-title" style="color:${color}">${name} ${r.driver ? '— '+r.driver : ''}</div>
+        <div class="orc-pills">
+          <span class="orc-pill ${pillCls}">${verdictTxt}</span>
+          <span class="orc-pill pill-neutral">${totalMi.toFixed(0)} mi</span>
+          <span class="orc-pill pill-neutral">${r.stops.length} stops</span>
+        </div>
+      </div>
+      <table class="orc-table">
+        <thead><tr><th>#</th><th>Job</th><th>City</th><th>Leg Miles</th><th>Revenue</th><th>Est Profit</th><th>Map</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="orc-footer">
+        <span>Revenue: <b>$${totalRev.toLocaleString()}</b></span>
+        <span>True Cost: <b>$${Math.round(costs.total).toLocaleString()}</b></span>
+        <span>Labor: <b>$${Math.round(costs.labor).toLocaleString()}</b></span>
+        <span>Fuel: <b>$${Math.round(costs.fuel).toLocaleString()}</b></span>
+        <span>QA+Admin: <b>$${Math.round(costs.qa+costs.admin).toLocaleString()}</b></span>
+        <span class="verdict ${verdictCls}">Net: ${verdictTxt}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const totalProfit = totalRevAll - totalCostAll;
+  kpiEl.innerHTML = `
+    <div class="kpi-card"><div class="kpi-val">${totalStopsAll}</div><div class="kpi-lbl">Total Stops</div></div>
+    <div class="kpi-card"><div class="kpi-val">${totalMiAll.toFixed(0)}</div><div class="kpi-lbl">Total Miles</div></div>
+    <div class="kpi-card"><div class="kpi-val">$${totalRevAll.toLocaleString()}</div><div class="kpi-lbl">Total Revenue</div></div>
+    <div class="kpi-card"><div class="kpi-val">$${Math.round(totalCostAll).toLocaleString()}</div><div class="kpi-lbl">True Cost</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:${totalProfit>=0?'#15803D':'#DC2626'}">${totalProfit>=0?'+':''} $${Math.abs(totalProfit).toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="kpi-lbl">Net ${totalProfit>=0?'Profit':'Loss'}</div></div>
+  `;
+  routesEl.innerHTML = cards;
+}
+
+// ═══════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════
+function setLoadMsg(msg, pct) {
+  document.getElementById('load-msg').textContent  = msg;
+  document.getElementById('load-bar').style.width  = pct + '%';
+}
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+
+function setStatus(type, text) {
+  const pill = document.getElementById('status-pill');
+  pill.className = `topbar-pill pill-${type}`;
+  document.getElementById('status-text').textContent = text;
+  const dot = pill.querySelector('.dot');
+  if (dot) dot.className = type === 'live' ? 'dot' : 'dot dot-pulse';
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+async function refreshData() {
+  localStorage.removeItem(CACHE_KEY_JOBS);
+  localStorage.removeItem(CACHE_KEY_CUSTS);
+  document.getElementById('loading').style.display = 'flex';
+  setLoadMsg('Refreshing from HCP…', 5);
+  const hasToken = CFG.APIFY_TOKEN && CFG.APIFY_TOKEN !== 'YOUR_APIFY_TOKEN_HERE';
+  if (!hasToken) { hideLoading(); toast('Add Apify token to enable live sync'); return; }
+  try {
+    const [rawJobs, rawCustomers] = await Promise.all([fetchJobs(), fetchCustomers()]);
+    allJobs      = rawJobs.map(normaliseJob);
+    allCustomers = rawCustomers.map(normaliseCustomer);
+    setStatus('live', `${allJobs.length} jobs · ${allCustomers.length} customers`);
+    setLoadMsg('Done!', 100);
+    setTimeout(hideLoading, 300);
+  } catch(err) {
+    hideLoading();
+    toast('Sync failed — check token');
+  }
+  renderJobList();
+  updateMap();
+  updateCounts();
+}
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
